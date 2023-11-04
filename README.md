@@ -1,6 +1,6 @@
 # ESP-NOW Gateway
 
-Gateway for data exchange between ESP-NOW devices and MQTT broker via WiFi/LAN.
+Gateway for ESP32 ESP-IDF for data exchange between ESP-NOW devices and MQTT broker via WiFi/LAN.
 
 ## Features
 
