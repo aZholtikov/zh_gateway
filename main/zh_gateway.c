@@ -165,6 +165,7 @@ static void s_zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32
         {
             esp_mqtt_client_config_t mqtt_config = {
                 .broker.address.uri = CONFIG_MQTT_BROKER_URL,
+                .buffer.size = 2048,
             };
             s_mqtt_client = esp_mqtt_client_init(&mqtt_config);
             esp_mqtt_client_register_event(s_mqtt_client, ESP_EVENT_ANY_ID, s_zh_mqtt_event_handler, NULL);
@@ -225,6 +226,7 @@ static void s_zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int3
         {
             esp_mqtt_client_config_t mqtt_config = {
                 .broker.address.uri = CONFIG_MQTT_BROKER_URL,
+                .buffer.size = 2048,
             };
             s_mqtt_client = esp_mqtt_client_init(&mqtt_config);
             esp_mqtt_client_register_event(s_mqtt_client, ESP_EVENT_ANY_ID, s_zh_mqtt_event_handler, NULL);
@@ -540,7 +542,7 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
                 zh_espnow_send(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 break;
             case ZHPT_RGB:
-                char *extracted_rgb_data = strtok(incoming_topic, ","); // Extract red value.
+                char *extracted_rgb_data = strtok(incoming_payload, ","); // Extract red value.
                 if (extracted_rgb_data == NULL)
                 {
                     break;
@@ -957,7 +959,7 @@ static void s_zh_espnow_led_send_mqtt_json_config_message(zh_espnow_data_t *devi
     char *rgb_command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 24);
     sprintf(rgb_command_topic, "%s/%s/" MAC_STR "/rgb", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     zh_json_t json;
-    char buffer[512] = {0};
+    char buffer[1024] = {0};
     zh_json_init(&json);
     zh_json_add(&json, "platform", "mqtt");
     zh_json_add(&json, "name", name);
