@@ -41,3 +41,4 @@ idf.py -p (PORT) flash
 ## Supported devices
 
 1. [zh_espnow_switch](http://git.zh.com.ru/alexey.zholtikov/zh_espnow_switch)
+2. [zh_espnow_led](http://git.zh.com.ru/alexey.zholtikov/zh_espnow_led)
