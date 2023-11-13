@@ -134,6 +134,7 @@ void app_main(void)
 #endif
     zh_espnow_init_config_t zh_espnow_init_config = ZH_ESPNOW_INIT_CONFIG_DEFAULT();
     zh_espnow_init_config.wifi_interface = WIFI_IF_AP;
+    zh_espnow_init_config.queue_size = 128;
     zh_espnow_init(&zh_espnow_init_config);
     esp_event_handler_instance_register(ZH_ESPNOW, ESP_EVENT_ANY_ID, &s_zh_espnow_event_handler, NULL, NULL);
     if (ota_state == ESP_OTA_IMG_PENDING_VERIFY)
@@ -258,66 +259,65 @@ static void s_zh_espnow_event_handler(void *arg, esp_event_base_t event_base, in
         {
             goto ZH_ESPNOW_EVENT_HANDLER_EXIT;
         }
-        zh_espnow_ota_data_t zh_espnow_ota_data = {0};
-        zh_espnow_data_t data_in = {0};
-        memcpy(&data_in, recv_data->data, recv_data->data_len);
-        char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(data_in.device_type)) + 20);
-        sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(data_in.device_type), MAC2STR(recv_data->mac_addr));
-        switch (data_in.payload_type)
+        zh_espnow_data_t data = {0};
+        memcpy(&data, recv_data->data, recv_data->data_len);
+        char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(data.device_type)) + 20);
+        sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(data.device_type), MAC2STR(recv_data->mac_addr));
+        switch (data.payload_type)
         {
         case ZHPT_ATTRIBUTES:
-            s_zh_espnow_send_mqtt_json_attributes_message(&data_in, recv_data->mac_addr);
+            s_zh_espnow_send_mqtt_json_attributes_message(&data, recv_data->mac_addr);
             break;
         case ZHPT_KEEP_ALIVE:
-            s_zh_espnow_send_mqtt_json_keep_alive_message(&data_in, recv_data->mac_addr);
+            s_zh_espnow_send_mqtt_json_keep_alive_message(&data, recv_data->mac_addr);
             break;
         case ZHPT_CONFIG:
-            switch (data_in.device_type)
+            switch (data.device_type)
             {
             case ZHDT_SWITCH:
-                s_zh_espnow_switch_send_mqtt_json_config_message(&data_in, recv_data->mac_addr);
+                s_zh_espnow_switch_send_mqtt_json_config_message(&data, recv_data->mac_addr);
                 break;
             case ZHDT_LED:
-                s_zh_espnow_led_send_mqtt_json_config_message(&data_in, recv_data->mac_addr);
+                s_zh_espnow_led_send_mqtt_json_config_message(&data, recv_data->mac_addr);
                 break;
             case ZHDT_SENSOR:
-                s_zh_espnow_sensor_send_mqtt_json_config_message(&data_in, recv_data->mac_addr);
+                s_zh_espnow_sensor_send_mqtt_json_config_message(&data, recv_data->mac_addr);
                 break;
             case ZHDT_BINARY_SENSOR:
-                s_zh_espnow_binary_sensor_send_mqtt_json_config_message(&data_in, recv_data->mac_addr);
+                s_zh_espnow_binary_sensor_send_mqtt_json_config_message(&data, recv_data->mac_addr);
                 break;
             default:
                 break;
             }
             break;
         case ZHPT_STATE:
-            switch (data_in.device_type)
+            switch (data.device_type)
             {
             case ZHDT_SWITCH:
-                s_zh_espnow_switch_send_mqtt_json_status_message(&data_in, recv_data->mac_addr);
+                s_zh_espnow_switch_send_mqtt_json_status_message(&data, recv_data->mac_addr);
                 break;
             case ZHDT_LED:
-                s_zh_espnow_led_send_mqtt_json_status_message(&data_in, recv_data->mac_addr);
+                s_zh_espnow_led_send_mqtt_json_status_message(&data, recv_data->mac_addr);
                 break;
             case ZHDT_SENSOR:
-                s_zh_espnow_sensor_send_mqtt_json_status_message(&data_in, recv_data->mac_addr);
+                s_zh_espnow_sensor_send_mqtt_json_status_message(&data, recv_data->mac_addr);
                 break;
             case ZHDT_BINARY_SENSOR:
-                s_zh_espnow_binary_sensor_send_mqtt_json_status_message(&data_in, recv_data->mac_addr);
+                s_zh_espnow_binary_sensor_send_mqtt_json_status_message(&data, recv_data->mac_addr);
                 break;
             default:
                 break;
             }
             break;
         case ZHPT_UPDATE:
+            zh_espnow_ota_data_t espnow_ota_data = {0};
             s_espnow_ota_in_progress = true;
-            memcpy(&zh_espnow_ota_data.chip_type, &data_in.payload_data.espnow_ota_message.chip_type, sizeof(data_in.payload_data.espnow_ota_message.chip_type));
-            memcpy(&zh_espnow_ota_data.device_type, &data_in.device_type, sizeof(data_in.device_type));
-            memcpy(&zh_espnow_ota_data.app_name, &data_in.payload_data.espnow_ota_message.app_name, sizeof(data_in.payload_data.espnow_ota_message.app_name));
-            memcpy(&zh_espnow_ota_data.app_version, &data_in.payload_data.espnow_ota_message.app_version, sizeof(data_in.payload_data.espnow_ota_message.app_version));
-            memcpy(&zh_espnow_ota_data.mac_addr, recv_data->mac_addr, sizeof(zh_espnow_ota_data.mac_addr));
-            xTaskCreatePinnedToCore(&s_zh_espnow_ota_update_task, "s_zh_espnow_ota_update_task", ZH_OTA_STACK_SIZE, &zh_espnow_ota_data, ZH_OTA_TASK_PRIORITY, NULL, tskNO_AFFINITY);
-            break;
+            memcpy(&espnow_ota_data.chip_type, &data.payload_data.espnow_ota_message.chip_type, sizeof(data.payload_data.espnow_ota_message.chip_type));
+            memcpy(&espnow_ota_data.device_type, &data.device_type, sizeof(data.device_type));
+            memcpy(&espnow_ota_data.app_name, &data.payload_data.espnow_ota_message.app_name, sizeof(data.payload_data.espnow_ota_message.app_name));
+            memcpy(&espnow_ota_data.app_version, &data.payload_data.espnow_ota_message.app_version, sizeof(data.payload_data.espnow_ota_message.app_version));
+            memcpy(&espnow_ota_data.mac_addr, recv_data->mac_addr, sizeof(espnow_ota_data.mac_addr));
+            xTaskCreatePinnedToCore(&s_zh_espnow_ota_update_task, "s_zh_espnow_ota_update_task", ZH_OTA_STACK_SIZE, &espnow_ota_data, ZH_OTA_TASK_PRIORITY, NULL, tskNO_AFFINITY);
             break;
         case ZHPT_UPDATE_PROGRESS:
             xSemaphoreGive(s_espnow_data_semaphore);
@@ -645,16 +645,16 @@ static void s_zh_self_ota_update_task(void *pvParameter)
 static void s_zh_espnow_ota_update_task(void *pvParameter)
 {
     s_espnow_data_semaphore = xSemaphoreCreateBinary();
-    zh_espnow_ota_data_t *zh_espnow_ota_data = pvParameter;
+    zh_espnow_ota_data_t *espnow_ota_data = pvParameter;
     zh_espnow_ota_message_t espnow_ota_message = {0};
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
-    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(zh_espnow_ota_data->device_type)) + 20);
-    sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(zh_espnow_ota_data->device_type), MAC2STR(zh_espnow_ota_data->mac_addr));
+    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(espnow_ota_data->device_type)) + 20);
+    sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(espnow_ota_data->device_type), MAC2STR(espnow_ota_data->mac_addr));
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_begin", 0, 2, true);
     char espnow_ota_write_data[ZH_OTA_BUFF_SIZE + 1] = {0};
-    char *app_name = (char *)calloc(1, strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(zh_espnow_ota_data->app_name) + 6);
-    sprintf(app_name, "%s/%s.bin", CONFIG_FIRMWARE_UPGRADE_URL, zh_espnow_ota_data->app_name);
+    char *app_name = (char *)calloc(1, strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(espnow_ota_data->app_name) + 6);
+    sprintf(app_name, "%s/%s.bin", CONFIG_FIRMWARE_UPGRADE_URL, espnow_ota_data->app_name);
     esp_http_client_config_t config = {
         .url = app_name,
         .cert_pem = (char *)server_certificate_pem_start,
@@ -667,7 +667,7 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
     esp_http_client_open(https_client, 0);
     esp_http_client_fetch_headers(https_client);
     data.payload_type = ZHPT_UPDATE_BEGIN;
-    zh_espnow_send(zh_espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+    zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_progress", 0, 2, true);
     for (;;)
     {
@@ -689,13 +689,13 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
             memcpy(&espnow_ota_message.data, &espnow_ota_write_data, data_read_size);
             data.payload_type = ZHPT_UPDATE_PROGRESS;
             data.payload_data = (zh_payload_data_t)espnow_ota_message;
-            zh_espnow_send(zh_espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+            zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
             if (xSemaphoreTake(s_espnow_data_semaphore, 30000 / portTICK_PERIOD_MS) != pdTRUE)
             {
                 esp_http_client_close(https_client);
                 esp_http_client_cleanup(https_client);
                 data.payload_type = ZHPT_UPDATE_ERROR;
-                zh_espnow_send(zh_espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+                zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 s_espnow_ota_in_progress = false;
                 s_ota_message_part_number = 0;
                 esp_mqtt_client_publish(s_mqtt_client, topic, "update_error_timeout", 0, 2, true);
@@ -711,7 +711,7 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
     esp_http_client_close(https_client);
     esp_http_client_cleanup(https_client);
     data.payload_type = ZHPT_UPDATE_END;
-    zh_espnow_send(zh_espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+    zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
     s_espnow_ota_in_progress = false;
     s_ota_message_part_number = 0;
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_end", 0, 2, true);
