@@ -569,6 +569,52 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
                 break;
             }
             break;
+        case ZHDT_SENSOR:
+            switch (incoming_data_payload_type)
+            {
+            case ZHPT_NONE:
+                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0 && s_espnow_ota_in_progress == false)
+                {
+                    data.payload_type = ZHPT_UPDATE;
+                    zh_espnow_send(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+                }
+                else if (strncmp(incoming_payload, "restart", strlen(incoming_payload) + 1) == 0)
+                {
+                    data.payload_type = ZHPT_RESTART;
+                    zh_espnow_send(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+                }
+                else
+                {
+                    break;
+                }
+                break;
+            default:
+                break;
+            }
+            break;
+        case ZHDT_BINARY_SENSOR:
+            switch (incoming_data_payload_type)
+            {
+            case ZHPT_NONE:
+                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0 && s_espnow_ota_in_progress == false)
+                {
+                    data.payload_type = ZHPT_UPDATE;
+                    zh_espnow_send(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+                }
+                else if (strncmp(incoming_payload, "restart", strlen(incoming_payload) + 1) == 0)
+                {
+                    data.payload_type = ZHPT_RESTART;
+                    zh_espnow_send(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+                }
+                else
+                {
+                    break;
+                }
+                break;
+            default:
+                break;
+            }
+            break;
         default:
             break;
         }
@@ -796,7 +842,7 @@ static void s_zh_gateway_send_mqtt_json_keep_alive_message_task(void *pvParamete
     keep_alive_message.message_frequency = 10;
     zh_binary_sensor_status_message_t binary_sensor_status_message = {0};
     binary_sensor_status_message.sensor_type = HAST_GATEWAY;
-    binary_sensor_status_message.status = HAONOFT_ON;
+    binary_sensor_status_message.connect = HAONOFT_CONNECT;
     zh_status_message_t status_message = {0};
     status_message = (zh_status_message_t)binary_sensor_status_message;
     zh_espnow_data_t data = {0};
@@ -1172,7 +1218,19 @@ static void s_zh_espnow_binary_sensor_send_mqtt_json_status_message(zh_espnow_da
     switch (device_data->payload_data.status_message.binary_sensor_status_message.sensor_type)
     {
     case HAST_GATEWAY:
-        zh_json_add(&json, "connectivity", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.status));
+        zh_json_add(&json, "connectivity", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.connect));
+        break;
+    case HAST_WINDOW:
+        zh_json_add(&json, "window", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.open));
+        zh_json_add(&json, "battery", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.battery));
+        break;
+    case HAST_DOOR:
+        zh_json_add(&json, "door", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.open));
+        zh_json_add(&json, "battery", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.battery));
+        break;
+    case HAST_LEAKAGE:
+        zh_json_add(&json, "moisture", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.leakage));
+        zh_json_add(&json, "battery", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.battery));
         break;
     default:
         break;

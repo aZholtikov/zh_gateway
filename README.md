@@ -43,3 +43,5 @@ idf.py -p (PORT) flash
 
 1. [zh_espnow_switch](http://git.zh.com.ru/alexey.zholtikov/zh_espnow_switch)
 2. [zh_espnow_led](http://git.zh.com.ru/alexey.zholtikov/zh_espnow_led)
+3. [zh_espnow_open_sensor](http://git.zh.com.ru/alexey.zholtikov/zh_espnow_open_sensor)
+4. [zh_espnow_leakage_sensor](http://git.zh.com.ru/alexey.zholtikov/zh_espnow_leakage_sensor)
