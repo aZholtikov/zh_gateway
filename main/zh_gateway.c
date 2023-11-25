@@ -115,6 +115,7 @@ void app_main(void)
     wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wifi_init_config);
     esp_wifi_set_mode(WIFI_MODE_AP);
+    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
     esp_wifi_start();
 #else
     esp_netif_create_default_wifi_sta();
@@ -127,6 +128,7 @@ void app_main(void)
         },
     };
     esp_wifi_set_mode(WIFI_MODE_APSTA);
+    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
     esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &s_zh_wifi_event_handler, NULL, NULL);
     esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &s_zh_wifi_event_handler, NULL, NULL);
