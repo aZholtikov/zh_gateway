@@ -28,8 +28,8 @@
 #define ZH_SNTP_STACK_SIZE 2048
 #define ZH_OTA_TASK_PRIORITY 3
 #define ZH_OTA_STACK_SIZE 8192
-#define ZH_HTTP_BUFF_SIZE 1024
-#define ZH_OTA_BUFF_SIZE 150
+
+#define ZH_KEEP_ALIVE_MESSAGE_FREQUENCY 10 // All devices on the network go offline if they do not receive a message from the gateway within this time period (in sec).
 
 extern const uint8_t server_certificate_pem_start[] asm("_binary_certificate_pem_start");
 extern const uint8_t server_certificate_pem_end[] asm("_binary_certificate_pem_end");
@@ -38,8 +38,10 @@ static bool s_sntp_is_enable = false;
 static bool s_mqtt_is_enable = false;
 static bool s_mqtt_is_connected = false;
 
+#if CONNECTION_TYPE_WIFI
 static esp_timer_handle_t s_wifi_reconnect_timer = {0};
 static uint8_t s_wifi_reconnect_retry_num = 0;
+#endif
 
 static bool s_espnow_self_ota_in_progress = false;
 static bool s_espnow_ota_in_progress = false;
@@ -52,8 +54,12 @@ static TaskHandle_t s_gateway_current_time_task = {0};
 
 static esp_mqtt_client_handle_t s_mqtt_client = {0};
 
+#if CONFIG_CONNECTION_TYPE_LAN
 static void s_zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+#endif
+#if CONNECTION_TYPE_WIFI
 static void s_zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+#endif
 static void s_zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 
@@ -117,7 +123,8 @@ void app_main(void)
     esp_wifi_set_mode(WIFI_MODE_AP);
     esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
     esp_wifi_start();
-#else
+#endif
+#if CONNECTION_TYPE_WIFI
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t wifi_init_sta_config = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wifi_init_sta_config);
@@ -146,6 +153,7 @@ void app_main(void)
     }
 }
 
+#if CONFIG_CONNECTION_TYPE_LAN
 static void s_zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     switch (event_id)
@@ -189,7 +197,9 @@ static void s_zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32
         break;
     }
 }
+#endif
 
+#if CONNECTION_TYPE_WIFI
 static void s_zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     switch (event_id)
@@ -250,6 +260,7 @@ static void s_zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int3
         break;
     }
 }
+#endif
 
 static void s_zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -630,7 +641,7 @@ static void s_zh_self_ota_update_task(void *pvParameter)
     esp_read_mac(self_mac, ESP_MAC_WIFI_SOFTAP);
     char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(ZHDT_GATEWAY)) + 20);
     sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(ZHDT_GATEWAY), MAC2STR(self_mac));
-    char self_ota_write_data[ZH_HTTP_BUFF_SIZE + 1] = {0};
+    char self_ota_write_data[1025] = {0};
     esp_ota_handle_t update_handle = {0};
     const esp_partition_t *update_partition = NULL;
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_begin", 0, 2, true);
@@ -653,7 +664,7 @@ static void s_zh_self_ota_update_task(void *pvParameter)
     esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &update_handle);
     for (;;)
     {
-        int data_read_size = esp_http_client_read(https_client, self_ota_write_data, ZH_HTTP_BUFF_SIZE);
+        int data_read_size = esp_http_client_read(https_client, self_ota_write_data, 1024);
         if (data_read_size < 0)
         {
             esp_http_client_close(https_client);
@@ -700,7 +711,7 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
     char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(espnow_ota_data->device_type)) + 20);
     sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(espnow_ota_data->device_type), MAC2STR(espnow_ota_data->mac_addr));
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_begin", 0, 2, true);
-    char espnow_ota_write_data[ZH_OTA_BUFF_SIZE + 1] = {0};
+    char espnow_ota_write_data[sizeof(espnow_ota_message.data) + 1] = {0};
     char *app_name = (char *)calloc(1, strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(espnow_ota_data->app_name) + 6);
     sprintf(app_name, "%s/%s.bin", CONFIG_FIRMWARE_UPGRADE_URL, espnow_ota_data->app_name);
     esp_http_client_config_t config = {
@@ -719,7 +730,7 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_progress", 0, 2, true);
     for (;;)
     {
-        int data_read_size = esp_http_client_read(https_client, espnow_ota_write_data, ZH_OTA_BUFF_SIZE);
+        int data_read_size = esp_http_client_read(https_client, espnow_ota_write_data, sizeof(espnow_ota_message.data));
         if (data_read_size < 0)
         {
             esp_http_client_close(https_client);
@@ -819,9 +830,9 @@ static void s_zh_gateway_send_mqtt_json_config_message(void)
     zh_binary_sensor_config_message_t binary_sensor_config_message = {0};
     binary_sensor_config_message.unique_id = 1;
     binary_sensor_config_message.binary_sensor_device_class = HABSDC_CONNECTIVITY;
-    binary_sensor_config_message.payload_on = HAONOFT_ON;
-    binary_sensor_config_message.payload_off = HAONOFT_OFF;
-    binary_sensor_config_message.expire_after = 30;
+    binary_sensor_config_message.payload_on = HAONOFT_CONNECT;
+    binary_sensor_config_message.payload_off = HAONOFT_NONE;
+    binary_sensor_config_message.expire_after = ZH_KEEP_ALIVE_MESSAGE_FREQUENCY * 3;
     binary_sensor_config_message.enabled_by_default = true;
     binary_sensor_config_message.force_update = true;
     binary_sensor_config_message.qos = 2;
@@ -841,7 +852,7 @@ static void s_zh_gateway_send_mqtt_json_keep_alive_message_task(void *pvParamete
     esp_read_mac(self_mac, ESP_MAC_WIFI_SOFTAP);
     zh_keep_alive_message_t keep_alive_message = {0};
     keep_alive_message.online_status = ONLINE;
-    keep_alive_message.message_frequency = 10;
+    keep_alive_message.message_frequency = ZH_KEEP_ALIVE_MESSAGE_FREQUENCY;
     zh_binary_sensor_status_message_t binary_sensor_status_message = {0};
     binary_sensor_status_message.sensor_type = HAST_GATEWAY;
     binary_sensor_status_message.connect = HAONOFT_CONNECT;
@@ -857,7 +868,7 @@ static void s_zh_gateway_send_mqtt_json_keep_alive_message_task(void *pvParamete
         data.payload_type = ZHPT_STATE;
         data.payload_data = (zh_payload_data_t)status_message;
         s_zh_espnow_binary_sensor_send_mqtt_json_status_message(&data, self_mac);
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        vTaskDelay(ZH_KEEP_ALIVE_MESSAGE_FREQUENCY * 1000 / portTICK_PERIOD_MS);
     }
     vTaskDelete(NULL);
 }
