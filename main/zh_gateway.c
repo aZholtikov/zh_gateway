@@ -38,7 +38,7 @@ static bool s_sntp_is_enable = false;
 static bool s_mqtt_is_enable = false;
 static bool s_mqtt_is_connected = false;
 
-#if CONNECTION_TYPE_WIFI
+#if CONFIG_CONNECTION_TYPE_WIFI
 static esp_timer_handle_t s_wifi_reconnect_timer = {0};
 static uint8_t s_wifi_reconnect_retry_num = 0;
 #endif
@@ -57,7 +57,7 @@ static esp_mqtt_client_handle_t s_mqtt_client = {0};
 #if CONFIG_CONNECTION_TYPE_LAN
 static void s_zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 #endif
-#if CONNECTION_TYPE_WIFI
+#if CONFIG_CONNECTION_TYPE_WIFI
 static void s_zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 #endif
 static void s_zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
@@ -120,11 +120,11 @@ void app_main(void)
     esp_eth_start(esp_eth_handle);
     wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wifi_init_config);
-    esp_wifi_set_mode(WIFI_MODE_AP);
-    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B);
     esp_wifi_start();
 #endif
-#if CONNECTION_TYPE_WIFI
+#if CONFIG_CONNECTION_TYPE_WIFI
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t wifi_init_sta_config = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wifi_init_sta_config);
@@ -142,7 +142,9 @@ void app_main(void)
     esp_wifi_start();
 #endif
     zh_espnow_init_config_t zh_espnow_init_config = ZH_ESPNOW_INIT_CONFIG_DEFAULT();
+#if CONFIG_CONNECTION_TYPE_WIFI
     zh_espnow_init_config.wifi_interface = WIFI_IF_AP;
+#endif
     zh_espnow_init_config.queue_size = 128;
     zh_espnow_init(&zh_espnow_init_config);
     esp_event_handler_instance_register(ZH_ESPNOW, ESP_EVENT_ANY_ID, &s_zh_espnow_event_handler, NULL, NULL);
@@ -199,7 +201,7 @@ static void s_zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32
 }
 #endif
 
-#if CONNECTION_TYPE_WIFI
+#if CONFIG_CONNECTION_TYPE_WIFI
 static void s_zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     switch (event_id)
@@ -451,7 +453,12 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
             if (incoming_data_payload_type == ZHPT_NONE)
             {
                 uint8_t self_mac[6] = {0};
+#if CONFIG_CONNECTION_TYPE_LAN
+                esp_read_mac(self_mac, ESP_MAC_WIFI_STA);
+#endif
+#if CONFIG_CONNECTION_TYPE_WIFI
                 esp_read_mac(self_mac, ESP_MAC_WIFI_SOFTAP);
+#endif
                 if (memcmp(&self_mac, &incoming_data_mac, 6) == 0)
                 {
                     if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0 && s_espnow_self_ota_in_progress == false)
@@ -638,7 +645,12 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
 static void s_zh_self_ota_update_task(void *pvParameter)
 {
     uint8_t self_mac[6] = {0};
+#if CONFIG_CONNECTION_TYPE_LAN
+    esp_read_mac(self_mac, ESP_MAC_WIFI_STA);
+#endif
+#if CONFIG_CONNECTION_TYPE_WIFI
     esp_read_mac(self_mac, ESP_MAC_WIFI_SOFTAP);
+#endif
     char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(ZHDT_GATEWAY)) + 20);
     sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(ZHDT_GATEWAY), MAC2STR(self_mac));
     char self_ota_write_data[1025] = {0};
@@ -799,7 +811,12 @@ static void s_zh_send_espnow_current_time_task(void *pvParameter)
 static void s_zh_gateway_send_mqtt_json_attributes_message_task(void *pvParameter)
 {
     uint8_t self_mac[6] = {0};
+#if CONFIG_CONNECTION_TYPE_LAN
+    esp_read_mac(self_mac, ESP_MAC_WIFI_STA);
+#endif
+#if CONFIG_CONNECTION_TYPE_WIFI
     esp_read_mac(self_mac, ESP_MAC_WIFI_SOFTAP);
+#endif
     const esp_app_desc_t *app_info = esp_app_get_description();
     zh_attributes_message_t attributes_message = {0};
     attributes_message.chip_type = HACHT_ESP32;
@@ -826,7 +843,12 @@ static void s_zh_gateway_send_mqtt_json_attributes_message_task(void *pvParamete
 static void s_zh_gateway_send_mqtt_json_config_message(void)
 {
     uint8_t self_mac[6] = {0};
+#if CONFIG_CONNECTION_TYPE_LAN
+    esp_read_mac(self_mac, ESP_MAC_WIFI_STA);
+#endif
+#if CONFIG_CONNECTION_TYPE_WIFI
     esp_read_mac(self_mac, ESP_MAC_WIFI_SOFTAP);
+#endif
     zh_binary_sensor_config_message_t binary_sensor_config_message = {0};
     binary_sensor_config_message.unique_id = 1;
     binary_sensor_config_message.binary_sensor_device_class = HABSDC_CONNECTIVITY;
@@ -849,7 +871,12 @@ static void s_zh_gateway_send_mqtt_json_config_message(void)
 static void s_zh_gateway_send_mqtt_json_keep_alive_message_task(void *pvParameter)
 {
     uint8_t self_mac[6] = {0};
+#if CONFIG_CONNECTION_TYPE_LAN
+    esp_read_mac(self_mac, ESP_MAC_WIFI_STA);
+#endif
+#if CONFIG_CONNECTION_TYPE_WIFI
     esp_read_mac(self_mac, ESP_MAC_WIFI_SOFTAP);
+#endif
     zh_keep_alive_message_t keep_alive_message = {0};
     keep_alive_message.online_status = ONLINE;
     keep_alive_message.message_frequency = ZH_KEEP_ALIVE_MESSAGE_FREQUENCY;
