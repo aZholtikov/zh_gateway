@@ -754,40 +754,49 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
         }
         else if (data_read_size > 0)
         {
+            uint8_t attempt_to_send = 0;
             ++s_ota_message_part_number;
             espnow_ota_message.data_len = data_read_size;
             espnow_ota_message.part = s_ota_message_part_number;
             memcpy(&espnow_ota_message.data, &espnow_ota_write_data, data_read_size);
             data.payload_type = ZHPT_UPDATE_PROGRESS;
             data.payload_data = (zh_payload_data_t)espnow_ota_message;
+        RESEND_OTA_DATA:
             zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
-            if (xSemaphoreTake(s_espnow_data_semaphore, 30000 / portTICK_PERIOD_MS) != pdTRUE)
+            if (xSemaphoreTake(s_espnow_data_semaphore, 3000 / portTICK_PERIOD_MS) != pdTRUE)
             {
-                esp_http_client_close(https_client);
-                esp_http_client_cleanup(https_client);
-                data.payload_type = ZHPT_UPDATE_ERROR;
-                zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
-                s_espnow_ota_in_progress = false;
-                s_ota_message_part_number = 0;
-                esp_mqtt_client_publish(s_mqtt_client, topic, "update_error_timeout", 0, 2, true);
-                free(topic);
-                vTaskDelete(NULL);
+                if (++attempt_to_send > 5)
+                {
+                    esp_http_client_close(https_client);
+                    esp_http_client_cleanup(https_client);
+                    data.payload_type = ZHPT_UPDATE_ERROR;
+                    zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+                    s_espnow_ota_in_progress = false;
+                    s_ota_message_part_number = 0;
+                    esp_mqtt_client_publish(s_mqtt_client, topic, "update_error_timeout", 0, 2, true);
+                    free(topic);
+                    vTaskDelete(NULL);
+                }
+                else
+                {
+                    goto RESEND_OTA_DATA;
+                }
             }
+            attempt_to_send = 0;
         }
         else
         {
-            break;
+            esp_http_client_close(https_client);
+            esp_http_client_cleanup(https_client);
+            data.payload_type = ZHPT_UPDATE_END;
+            zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+            s_espnow_ota_in_progress = false;
+            s_ota_message_part_number = 0;
+            esp_mqtt_client_publish(s_mqtt_client, topic, "update_end", 0, 2, true);
+            free(topic);
+            vTaskDelete(NULL);
         }
     }
-    esp_http_client_close(https_client);
-    esp_http_client_cleanup(https_client);
-    data.payload_type = ZHPT_UPDATE_END;
-    zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
-    s_espnow_ota_in_progress = false;
-    s_ota_message_part_number = 0;
-    esp_mqtt_client_publish(s_mqtt_client, topic, "update_end", 0, 2, true);
-    free(topic);
-    vTaskDelete(NULL);
 }
 
 static void s_zh_send_espnow_current_time_task(void *pvParameter)
