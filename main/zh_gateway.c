@@ -121,7 +121,7 @@ void app_main(void)
     wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&wifi_init_config);
     esp_wifi_set_mode(WIFI_MODE_STA);
-    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B);
+    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR);
     esp_wifi_start();
 #endif
 #if CONFIG_CONNECTION_TYPE_WIFI
@@ -135,7 +135,7 @@ void app_main(void)
         },
     };
     esp_wifi_set_mode(WIFI_MODE_APSTA);
-    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
+    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR);
     esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &s_zh_wifi_event_handler, NULL, NULL);
     esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &s_zh_wifi_event_handler, NULL, NULL);
@@ -145,7 +145,6 @@ void app_main(void)
 #if CONFIG_CONNECTION_TYPE_WIFI
     zh_espnow_init_config.wifi_interface = WIFI_IF_AP;
 #endif
-    zh_espnow_init_config.queue_size = 128;
     zh_espnow_init(&zh_espnow_init_config);
     esp_event_handler_instance_register(ZH_ESPNOW, ESP_EVENT_ANY_ID, &s_zh_espnow_event_handler, NULL, NULL);
     if (ota_state == ESP_OTA_IMG_PENDING_VERIFY)
@@ -739,6 +738,7 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
     esp_http_client_fetch_headers(https_client);
     data.payload_type = ZHPT_UPDATE_BEGIN;
     zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+    xSemaphoreTake(s_espnow_data_semaphore, 5000 / portTICK_PERIOD_MS);
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_progress", 0, 2, true);
     for (;;)
     {
@@ -754,35 +754,25 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
         }
         else if (data_read_size > 0)
         {
-            uint8_t attempt_to_send = 0;
             ++s_ota_message_part_number;
             espnow_ota_message.data_len = data_read_size;
             espnow_ota_message.part = s_ota_message_part_number;
             memcpy(&espnow_ota_message.data, &espnow_ota_write_data, data_read_size);
             data.payload_type = ZHPT_UPDATE_PROGRESS;
             data.payload_data = (zh_payload_data_t)espnow_ota_message;
-        RESEND_OTA_DATA:
             zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
-            if (xSemaphoreTake(s_espnow_data_semaphore, 3000 / portTICK_PERIOD_MS) != pdTRUE)
+            if (xSemaphoreTake(s_espnow_data_semaphore, 100 / portTICK_PERIOD_MS) != pdTRUE)
             {
-                if (++attempt_to_send > 5)
-                {
-                    esp_http_client_close(https_client);
-                    esp_http_client_cleanup(https_client);
-                    data.payload_type = ZHPT_UPDATE_ERROR;
-                    zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
-                    s_espnow_ota_in_progress = false;
-                    s_ota_message_part_number = 0;
-                    esp_mqtt_client_publish(s_mqtt_client, topic, "update_error_timeout", 0, 2, true);
-                    free(topic);
-                    vTaskDelete(NULL);
-                }
-                else
-                {
-                    goto RESEND_OTA_DATA;
-                }
+                esp_http_client_close(https_client);
+                esp_http_client_cleanup(https_client);
+                data.payload_type = ZHPT_UPDATE_ERROR;
+                zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+                s_espnow_ota_in_progress = false;
+                s_ota_message_part_number = 0;
+                esp_mqtt_client_publish(s_mqtt_client, topic, "update_error", 0, 2, true);
+                free(topic);
+                vTaskDelete(NULL);
             }
-            attempt_to_send = 0;
         }
         else
         {
