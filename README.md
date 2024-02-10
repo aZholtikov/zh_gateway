@@ -2,6 +2,10 @@
 
 Gateway for ESP32 ESP-IDF for data exchange between ESP-NOW devices and MQTT broker via WiFi/LAN.
 
+## Tested on
+
+1. ESP32 ESP-IDF v5.1.0
+
 ## Features
 
 1. Automatically adds gateway configuration to Home Assistan via MQTT discovery as a binary_sensor.
@@ -14,7 +18,7 @@ Gateway for ESP32 ESP-IDF for data exchange between ESP-NOW devices and MQTT bro
 1. ESP-NOW mesh network based on the [zh_network](http://git.zh.com.ru/alexey.zholtikov/zh_network).
 2. For initial settings use "menuconfig -> ZH Gateway Configuration".
 3. To restart the gateway, send the "restart" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7").
-4. To update the gateway firmware, send the "update" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7"). The update path should be like as "https://your_server/zh_gateway_esp32.bin". The online status of the update is displayed in the root gateway topic.
+4. To update the gateway firmware, send the "update" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7"). The update path should be like as "https://your_server/zh_gateway.bin". The online status of the update is displayed in the root gateway topic.
 
 ## Build and flash
 
@@ -28,11 +32,6 @@ idf.py menuconfig
 idf.py all
 idf.py -p (PORT) flash
 ```
-
-## Tested on
-
-1. WT32-ETH01.
-2. ESP32 NodeMCU V3.
 
 ## Attention
 
