@@ -277,8 +277,8 @@ static void s_zh_network_event_handler(void *arg, esp_event_base_t event_base, i
         }
         zh_espnow_data_t data = {0};
         memcpy(&data, recv_data->data, recv_data->data_len);
-        char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(data.device_type)) + 20);
-        sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(data.device_type), MAC2STR(recv_data->mac_addr));
+        char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(data.device_type)) + 20);
+        sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(data.device_type), MAC2STR(recv_data->mac_addr));
         switch (data.payload_type)
         {
         case ZHPT_ATTRIBUTES:
@@ -370,7 +370,7 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
             char *supported_device_type = NULL;
             for (zh_device_type_t i = 1; i <= ZHDT_MAX; ++i)
             {
-                supported_device_type = get_device_type_value_name(i);
+                supported_device_type = zh_get_device_type_value_name(i);
                 topic_for_subscribe = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(supported_device_type) + 4);
                 sprintf(topic_for_subscribe, "%s/%s/#", CONFIG_MQTT_TOPIC_PREFIX, supported_device_type);
                 esp_mqtt_client_subscribe(s_mqtt_client, topic_for_subscribe, 2);
@@ -388,7 +388,7 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
             vTaskDelete(s_gateway_attributes_message_task);
             vTaskDelete(s_gateway_keep_alive_message_task);
             zh_keep_alive_message_t keep_alive_message = {0};
-            keep_alive_message.online_status = OFFLINE;
+            keep_alive_message.online_status = ZH_OFFLINE;
             zh_espnow_data_t data = {0};
             data.device_type = ZHDT_GATEWAY;
             data.payload_type = ZHPT_KEEP_ALIVE;
@@ -416,7 +416,7 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
         }
         for (zh_device_type_t i = 1; i < ZHDT_MAX; ++i)
         {
-            if (strncmp(extracted_topic_data, get_device_type_value_name(i), strlen(extracted_topic_data) + 1) == 0)
+            if (strncmp(extracted_topic_data, zh_get_device_type_value_name(i), strlen(extracted_topic_data) + 1) == 0)
             {
                 incoming_data_device_type = i;
                 break;
@@ -433,7 +433,7 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
         {
             for (zh_payload_type_t i = 1; i < ZHPT_MAX; ++i)
             {
-                if (strncmp(extracted_topic_data, get_payload_type_value_name(i), strlen(extracted_topic_data) + 1) == 0)
+                if (strncmp(extracted_topic_data, zh_get_payload_type_value_name(i), strlen(extracted_topic_data) + 1) == 0)
                 {
                     incoming_data_payload_type = i;
                     break;
@@ -493,7 +493,7 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
             case ZHPT_SET:
                 for (ha_on_off_type_t i = 1; i < HAONOFT_MAX; ++i)
                 {
-                    if (strncmp(incoming_payload, get_on_off_type_value_name(i), strlen(incoming_payload) + 1) == 0)
+                    if (strncmp(incoming_payload, zh_get_on_off_type_value_name(i), strlen(incoming_payload) + 1) == 0)
                     {
                         switch_status_message.status = i;
                         status_message = (zh_status_message_t)switch_status_message;
@@ -530,7 +530,7 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
             case ZHPT_SET:
                 for (ha_on_off_type_t i = 1; i < HAONOFT_MAX; ++i)
                 {
-                    if (strncmp(incoming_payload, get_on_off_type_value_name(i), strlen(incoming_payload) + 1) == 0)
+                    if (strncmp(incoming_payload, zh_get_on_off_type_value_name(i), strlen(incoming_payload) + 1) == 0)
                     {
                         led_status_message.status = i;
                         status_message = (zh_status_message_t)led_status_message;
@@ -638,8 +638,8 @@ static void s_zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int3
 
 static void s_zh_self_ota_update_task(void *pvParameter)
 {
-    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(ZHDT_GATEWAY)) + 20);
-    sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(ZHDT_GATEWAY), MAC2STR(s_self_mac));
+    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(ZHDT_GATEWAY)) + 20);
+    sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(ZHDT_GATEWAY), MAC2STR(s_self_mac));
     char self_ota_write_data[1025] = {0};
     esp_ota_handle_t update_handle = {0};
     const esp_partition_t *update_partition = NULL;
@@ -707,8 +707,8 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
     zh_espnow_ota_message_t espnow_ota_message = {0};
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
-    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(espnow_ota_data->device_type)) + 20);
-    sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(espnow_ota_data->device_type), MAC2STR(espnow_ota_data->mac_addr));
+    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(espnow_ota_data->device_type)) + 20);
+    sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(espnow_ota_data->device_type), MAC2STR(espnow_ota_data->mac_addr));
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_begin", 0, 2, true);
     char espnow_ota_write_data[sizeof(espnow_ota_message.data) + 1] = {0};
     char *app_name = (char *)calloc(1, strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(espnow_ota_data->app_name) + 6);
@@ -844,7 +844,7 @@ static void s_zh_gateway_send_mqtt_json_config_message(void)
 static void s_zh_gateway_send_mqtt_json_keep_alive_message_task(void *pvParameter)
 {
     zh_keep_alive_message_t keep_alive_message = {0};
-    keep_alive_message.online_status = ONLINE;
+    keep_alive_message.online_status = ZH_ONLINE;
     zh_binary_sensor_status_message_t binary_sensor_status_message = {0};
     binary_sensor_status_message.sensor_type = HAST_GATEWAY;
     binary_sensor_status_message.connect = HAONOFT_CONNECT;
@@ -886,12 +886,12 @@ static void s_zh_espnow_send_mqtt_json_attributes_message(zh_espnow_data_t *devi
     zh_json_t json;
     char buffer[512] = {0};
     zh_json_init(&json);
-    zh_json_add(&json, "Type", get_device_type_value_name(device_data->device_type));
+    zh_json_add(&json, "Type", zh_get_device_type_value_name(device_data->device_type));
     zh_json_add(&json, "MAC", mac);
-    zh_json_add(&json, "Chip", get_chip_type_value_name(device_data->payload_data.attributes_message.chip_type));
+    zh_json_add(&json, "Chip", zh_get_chip_type_value_name(device_data->payload_data.attributes_message.chip_type));
     if (device_data->payload_data.attributes_message.sensor_type != 0)
     {
-        zh_json_add(&json, "Sensor", get_sensor_type_value_name(device_data->payload_data.attributes_message.sensor_type));
+        zh_json_add(&json, "Sensor", zh_get_sensor_type_value_name(device_data->payload_data.attributes_message.sensor_type));
     }
     zh_json_add(&json, "CPU frequency", cpu_frequency);
     zh_json_add(&json, "Flash size", device_data->payload_data.attributes_message.flash_size);
@@ -903,8 +903,8 @@ static void s_zh_espnow_send_mqtt_json_attributes_message(zh_espnow_data_t *devi
     zh_json_add(&json, "Uptime", uptime);
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(s_mqtt_client, topic, buffer, 0, 2, true);
     free(mac);
     free(uptime);
@@ -917,27 +917,27 @@ static void s_zh_espnow_send_mqtt_json_attributes_message(zh_espnow_data_t *devi
 
 static void s_zh_espnow_send_mqtt_json_keep_alive_message(zh_espnow_data_t *device_data, uint8_t *device_mac)
 {
-    char *status = (device_data->payload_data.keep_alive_message.online_status == ONLINE) ? "online" : "offline";
-    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 27);
-    sprintf(topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *status = (device_data->payload_data.keep_alive_message.online_status == ZH_ONLINE) ? "online" : "offline";
+    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
+    sprintf(topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(s_mqtt_client, topic, status, 0, 2, true);
     free(topic);
 }
 
 static void s_zh_espnow_switch_send_mqtt_json_config_message(zh_espnow_data_t *device_data, uint8_t *device_mac)
 {
-    char *name = (char *)calloc(1, strlen(get_device_type_value_name(device_data->device_type)) + 19);
-    sprintf(name, "%s " MAC_STR "", get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *name = (char *)calloc(1, strlen(zh_get_device_type_value_name(device_data->device_type)) + 19);
+    sprintf(name, "%s " MAC_STR "", zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *unique_id = (char *)calloc(1, 22);
     sprintf(unique_id, "" MAC_STR "-%d", MAC2STR(device_mac), device_data->payload_data.config_message.switch_config_message.unique_id);
-    char *state_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *availability_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 27);
-    sprintf(availability_topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 24);
-    sprintf(command_topic, "%s/%s/" MAC_STR "/set", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *json_attributes_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *state_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *availability_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
+    sprintf(availability_topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24);
+    sprintf(command_topic, "%s/%s/" MAC_STR "/set", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *json_attributes_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *qos = (char *)calloc(1, 4);
     sprintf(qos, "%d", device_data->payload_data.config_message.switch_config_message.qos);
     zh_json_t json;
@@ -946,7 +946,7 @@ static void s_zh_espnow_switch_send_mqtt_json_config_message(zh_espnow_data_t *d
     zh_json_add(&json, "platform", "mqtt");
     zh_json_add(&json, "name", name);
     zh_json_add(&json, "unique_id", unique_id);
-    zh_json_add(&json, "device_class", get_switch_device_class_value_name(device_data->payload_data.config_message.switch_config_message.device_class));
+    zh_json_add(&json, "device_class", zh_get_switch_device_class_value_name(device_data->payload_data.config_message.switch_config_message.device_class));
     zh_json_add(&json, "state_topic", state_topic);
     zh_json_add(&json, "value_template", "{{ value_json.state }}");
     zh_json_add(&json, "availability_topic", availability_topic);
@@ -954,8 +954,8 @@ static void s_zh_espnow_switch_send_mqtt_json_config_message(zh_espnow_data_t *d
     zh_json_add(&json, "json_attributes_topic", json_attributes_topic);
     zh_json_add(&json, "enabled_by_default", (device_data->payload_data.config_message.switch_config_message.enabled_by_default == true) ? "true" : "false");
     zh_json_add(&json, "optimistic", (device_data->payload_data.config_message.switch_config_message.optimistic == true) ? "true" : "false");
-    zh_json_add(&json, "payload_on", get_on_off_type_value_name(device_data->payload_data.config_message.switch_config_message.payload_on));
-    zh_json_add(&json, "payload_off", get_on_off_type_value_name(device_data->payload_data.config_message.switch_config_message.payload_off));
+    zh_json_add(&json, "payload_on", zh_get_on_off_type_value_name(device_data->payload_data.config_message.switch_config_message.payload_on));
+    zh_json_add(&json, "payload_off", zh_get_on_off_type_value_name(device_data->payload_data.config_message.switch_config_message.payload_off));
     zh_json_add(&json, "qos", qos);
     zh_json_add(&json, "retain", (device_data->payload_data.config_message.switch_config_message.retain == true) ? "true" : "false");
     zh_json_create(&json, buffer);
@@ -978,37 +978,37 @@ static void s_zh_espnow_switch_send_mqtt_json_status_message(zh_espnow_data_t *d
     zh_json_t json;
     char buffer[128] = {0};
     zh_json_init(&json);
-    zh_json_add(&json, "state", get_on_off_type_value_name(device_data->payload_data.status_message.switch_status_message.status));
+    zh_json_add(&json, "state", zh_get_on_off_type_value_name(device_data->payload_data.status_message.switch_status_message.status));
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(s_mqtt_client, topic, buffer, 0, 2, true);
     free(topic);
 }
 
 static void s_zh_espnow_led_send_mqtt_json_config_message(zh_espnow_data_t *device_data, uint8_t *device_mac)
 {
-    char *name = (char *)calloc(1, strlen(get_device_type_value_name(device_data->device_type)) + 19);
-    sprintf(name, "%s " MAC_STR "", get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *name = (char *)calloc(1, strlen(zh_get_device_type_value_name(device_data->device_type)) + 19);
+    sprintf(name, "%s " MAC_STR "", zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *unique_id = (char *)calloc(1, 22);
     sprintf(unique_id, "" MAC_STR "-%d", MAC2STR(device_mac), device_data->payload_data.config_message.led_config_message.unique_id);
-    char *state_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *availability_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 27);
-    sprintf(availability_topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 24);
-    sprintf(command_topic, "%s/%s/" MAC_STR "/set", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *json_attributes_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *state_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *availability_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
+    sprintf(availability_topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24);
+    sprintf(command_topic, "%s/%s/" MAC_STR "/set", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *json_attributes_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *qos = (char *)calloc(1, 4);
     sprintf(qos, "%d", device_data->payload_data.config_message.led_config_message.qos);
-    char *brightness_command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(brightness_command_topic, "%s/%s/" MAC_STR "/brightness", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *color_temp_command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 32);
-    sprintf(color_temp_command_topic, "%s/%s/" MAC_STR "/temperature", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *rgb_command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 24);
-    sprintf(rgb_command_topic, "%s/%s/" MAC_STR "/rgb", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *brightness_command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(brightness_command_topic, "%s/%s/" MAC_STR "/brightness", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *color_temp_command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 32);
+    sprintf(color_temp_command_topic, "%s/%s/" MAC_STR "/temperature", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *rgb_command_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24);
+    sprintf(rgb_command_topic, "%s/%s/" MAC_STR "/rgb", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     zh_json_t json;
     char buffer[1024] = {0};
     zh_json_init(&json);
@@ -1022,8 +1022,8 @@ static void s_zh_espnow_led_send_mqtt_json_config_message(zh_espnow_data_t *devi
     zh_json_add(&json, "json_attributes_topic", json_attributes_topic);
     zh_json_add(&json, "enabled_by_default", (device_data->payload_data.config_message.led_config_message.enabled_by_default == true) ? "true" : "false");
     zh_json_add(&json, "optimistic", (device_data->payload_data.config_message.led_config_message.optimistic == true) ? "true" : "false");
-    zh_json_add(&json, "payload_on", get_on_off_type_value_name(device_data->payload_data.config_message.led_config_message.payload_on));
-    zh_json_add(&json, "payload_off", get_on_off_type_value_name(device_data->payload_data.config_message.led_config_message.payload_off));
+    zh_json_add(&json, "payload_on", zh_get_on_off_type_value_name(device_data->payload_data.config_message.led_config_message.payload_on));
+    zh_json_add(&json, "payload_off", zh_get_on_off_type_value_name(device_data->payload_data.config_message.led_config_message.payload_off));
     zh_json_add(&json, "qos", qos);
     zh_json_add(&json, "retain", (device_data->payload_data.config_message.led_config_message.retain == true) ? "true" : "false");
     zh_json_add(&json, "brightness_state_topic", state_topic);
@@ -1070,30 +1070,30 @@ static void s_zh_espnow_led_send_mqtt_json_status_message(zh_espnow_data_t *devi
     zh_json_t json;
     char buffer[128] = {0};
     zh_json_init(&json);
-    zh_json_add(&json, "state", get_on_off_type_value_name(device_data->payload_data.status_message.led_status_message.status));
+    zh_json_add(&json, "state", zh_get_on_off_type_value_name(device_data->payload_data.status_message.led_status_message.status));
     zh_json_add(&json, "brightness", brightness);
     zh_json_add(&json, "temperature", temperature);
     zh_json_add(&json, "rgb", rgb);
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(s_mqtt_client, topic, buffer, 0, 2, true);
     free(topic);
 }
 
 static void s_zh_espnow_sensor_send_mqtt_json_config_message(zh_espnow_data_t *device_data, uint8_t *device_mac)
 {
-    char *name = (char *)calloc(1, strlen(get_device_type_value_name(device_data->device_type)) + 19);
-    sprintf(name, "%s " MAC_STR "", get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *name = (char *)calloc(1, strlen(zh_get_device_type_value_name(device_data->device_type)) + 19);
+    sprintf(name, "%s " MAC_STR "", zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *unique_id = (char *)calloc(1, 22);
     sprintf(unique_id, "" MAC_STR "-%d", MAC2STR(device_mac), device_data->payload_data.config_message.sensor_config_message.unique_id);
-    char *state_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *value_template = (char *)calloc(1, strlen(get_sensor_device_class_value_name(device_data->payload_data.config_message.sensor_config_message.sensor_device_class)) + 18);
-    sprintf(value_template, "{{ value_json.%s }}", get_sensor_device_class_value_name(device_data->payload_data.config_message.sensor_config_message.sensor_device_class));
-    char *json_attributes_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *state_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *value_template = (char *)calloc(1, strlen(zh_get_sensor_device_class_value_name(device_data->payload_data.config_message.sensor_config_message.sensor_device_class)) + 18);
+    sprintf(value_template, "{{ value_json.%s }}", zh_get_sensor_device_class_value_name(device_data->payload_data.config_message.sensor_config_message.sensor_device_class));
+    char *json_attributes_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *qos = (char *)calloc(1, 4);
     sprintf(qos, "%d", device_data->payload_data.config_message.sensor_config_message.qos);
     char *expire_after = (char *)calloc(1, 6);
@@ -1106,7 +1106,7 @@ static void s_zh_espnow_sensor_send_mqtt_json_config_message(zh_espnow_data_t *d
     zh_json_add(&json, "platform", "mqtt");
     zh_json_add(&json, "name", name);
     zh_json_add(&json, "unique_id", unique_id);
-    zh_json_add(&json, "device_class", get_sensor_device_class_value_name(device_data->payload_data.config_message.sensor_config_message.sensor_device_class));
+    zh_json_add(&json, "device_class", zh_get_sensor_device_class_value_name(device_data->payload_data.config_message.sensor_config_message.sensor_device_class));
     zh_json_add(&json, "state_topic", state_topic);
     zh_json_add(&json, "value_template", value_template);
     zh_json_add(&json, "json_attributes_topic", json_attributes_topic);
@@ -1150,8 +1150,8 @@ static void s_zh_espnow_sensor_send_mqtt_json_status_message(zh_espnow_data_t *d
     }
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(s_mqtt_client, topic, buffer, 0, 2, true);
     free(temperature);
     free(topic);
@@ -1159,16 +1159,16 @@ static void s_zh_espnow_sensor_send_mqtt_json_status_message(zh_espnow_data_t *d
 
 static void s_zh_espnow_binary_sensor_send_mqtt_json_config_message(zh_espnow_data_t *device_data, uint8_t *device_mac)
 {
-    char *name = (char *)calloc(1, strlen(get_device_type_value_name(device_data->device_type)) + 19);
-    sprintf(name, "%s " MAC_STR "", get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *name = (char *)calloc(1, strlen(zh_get_device_type_value_name(device_data->device_type)) + 19);
+    sprintf(name, "%s " MAC_STR "", zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *unique_id = (char *)calloc(1, 22);
     sprintf(unique_id, "" MAC_STR "-%d", MAC2STR(device_mac), device_data->payload_data.config_message.binary_sensor_config_message.unique_id);
-    char *state_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *value_template = (char *)calloc(1, strlen(get_binary_sensor_device_class_value_name(device_data->payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class)) + 18);
-    sprintf(value_template, "{{ value_json.%s }}", get_binary_sensor_device_class_value_name(device_data->payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class));
-    char *json_attributes_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *state_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *value_template = (char *)calloc(1, strlen(zh_get_binary_sensor_device_class_value_name(device_data->payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class)) + 18);
+    sprintf(value_template, "{{ value_json.%s }}", zh_get_binary_sensor_device_class_value_name(device_data->payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class));
+    char *json_attributes_topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *qos = (char *)calloc(1, 4);
     sprintf(qos, "%d", device_data->payload_data.config_message.binary_sensor_config_message.qos);
     char *expire_after = (char *)calloc(1, 6);
@@ -1181,13 +1181,13 @@ static void s_zh_espnow_binary_sensor_send_mqtt_json_config_message(zh_espnow_da
     zh_json_add(&json, "platform", "mqtt");
     zh_json_add(&json, "name", name);
     zh_json_add(&json, "unique_id", unique_id);
-    zh_json_add(&json, "device_class", get_binary_sensor_device_class_value_name(device_data->payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class));
+    zh_json_add(&json, "device_class", zh_get_binary_sensor_device_class_value_name(device_data->payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class));
     zh_json_add(&json, "state_topic", state_topic);
     zh_json_add(&json, "value_template", value_template);
     zh_json_add(&json, "json_attributes_topic", json_attributes_topic);
     zh_json_add(&json, "enabled_by_default", (device_data->payload_data.config_message.binary_sensor_config_message.enabled_by_default == true) ? "true" : "false");
-    zh_json_add(&json, "payload_on", get_on_off_type_value_name(device_data->payload_data.config_message.binary_sensor_config_message.payload_on));
-    zh_json_add(&json, "payload_off", get_on_off_type_value_name(device_data->payload_data.config_message.binary_sensor_config_message.payload_off));
+    zh_json_add(&json, "payload_on", zh_get_on_off_type_value_name(device_data->payload_data.config_message.binary_sensor_config_message.payload_on));
+    zh_json_add(&json, "payload_off", zh_get_on_off_type_value_name(device_data->payload_data.config_message.binary_sensor_config_message.payload_off));
     zh_json_add(&json, "qos", qos);
     zh_json_add(&json, "retain", (device_data->payload_data.config_message.binary_sensor_config_message.retain == true) ? "true" : "false");
     if (device_data->payload_data.config_message.binary_sensor_config_message.expire_after != 0)
@@ -1223,27 +1223,27 @@ static void s_zh_espnow_binary_sensor_send_mqtt_json_status_message(zh_espnow_da
     switch (device_data->payload_data.status_message.binary_sensor_status_message.sensor_type)
     {
     case HAST_GATEWAY:
-        zh_json_add(&json, "connectivity", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.connect));
+        zh_json_add(&json, "connectivity", zh_get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.connect));
         break;
     case HAST_WINDOW:
-        zh_json_add(&json, "window", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.open));
-        zh_json_add(&json, "battery", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.battery));
+        zh_json_add(&json, "window", zh_get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.open));
+        zh_json_add(&json, "battery", zh_get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.battery));
         break;
     case HAST_DOOR:
-        zh_json_add(&json, "door", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.open));
-        zh_json_add(&json, "battery", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.battery));
+        zh_json_add(&json, "door", zh_get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.open));
+        zh_json_add(&json, "battery", zh_get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.battery));
         break;
     case HAST_LEAKAGE:
-        zh_json_add(&json, "moisture", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.leakage));
-        zh_json_add(&json, "battery", get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.battery));
+        zh_json_add(&json, "moisture", zh_get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.leakage));
+        zh_json_add(&json, "battery", zh_get_on_off_type_value_name(device_data->payload_data.status_message.binary_sensor_status_message.battery));
         break;
     default:
         break;
     }
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)calloc(1, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(s_mqtt_client, topic, buffer, 0, 2, true);
     free(topic);
 }
