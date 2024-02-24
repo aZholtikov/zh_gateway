@@ -726,7 +726,7 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
     esp_http_client_fetch_headers(https_client);
     data.payload_type = ZHPT_UPDATE_BEGIN;
     zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
-    xSemaphoreTake(s_espnow_data_semaphore, 5000 / portTICK_PERIOD_MS);
+    xSemaphoreTake(s_espnow_data_semaphore, 30000 / portTICK_PERIOD_MS);
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_progress", 0, 2, true);
     for (;;)
     {
@@ -749,7 +749,7 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
             data.payload_type = ZHPT_UPDATE_PROGRESS;
             data.payload_data = (zh_payload_data_t)espnow_ota_message;
             zh_espnow_send(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
-            if (xSemaphoreTake(s_espnow_data_semaphore, 1000 / portTICK_PERIOD_MS) != pdTRUE)
+            if (xSemaphoreTake(s_espnow_data_semaphore, 3000 / portTICK_PERIOD_MS) != pdTRUE)
             {
                 esp_http_client_close(https_client);
                 esp_http_client_cleanup(https_client);
