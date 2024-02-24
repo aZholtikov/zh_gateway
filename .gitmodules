@@ -1,12 +1,9 @@
-[submodule "zh_network"]
-	path = components/zh_network
-	url = http://git.zh.com.ru/alexey.zholtikov/zh_network
-[submodule "zh_vector"]
-	path = components/zh_vector
-	url = http://git.zh.com.ru/alexey.zholtikov/zh_vector
 [submodule "zh_config"]
 	path = components/zh_config
 	url = http://git.zh.com.ru/alexey.zholtikov/zh_config
 [submodule "zh_json"]
 	path = components/zh_json
 	url = http://git.zh.com.ru/alexey.zholtikov/zh_json
+[submodule "components/zh_espnow"]
+	path = components/zh_espnow
+	url = http://git.zh.com.ru/alexey.zholtikov/zh_espnow
