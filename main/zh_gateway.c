@@ -103,7 +103,7 @@ void app_main(void)
     config.pull_down_en = GPIO_PULLDOWN_DISABLE;
     config.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&config);
-    gpio_set_level(ZH_LAN_MODULE_POWER_PIN, HIGH);
+    gpio_set_level(ZH_LAN_MODULE_POWER_PIN, 1);
     esp_netif_config_t esp_netif_config = ESP_NETIF_DEFAULT_ETH();
     esp_netif_t *esp_netif_eth = esp_netif_new(&esp_netif_config);
     eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
