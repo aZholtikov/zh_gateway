@@ -1,5 +1,16 @@
 menu "ZH Gateway Configuration"
 	
+	choice NETWORK_TYPE
+		prompt "Network type"
+		help
+			Network type.
+		default NETWORK_TYPE_DIRECT
+		config NETWORK_TYPE_DIRECT
+			bool "DIRECT"
+		config NETWORK_TYPE_MESH
+			bool "MESH"
+	endchoice
+
 	choice CONNECTION_TYPE
 		prompt "Connection type"
 		help

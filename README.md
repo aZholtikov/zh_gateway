@@ -12,13 +12,15 @@ Gateway for ESP32 ESP-IDF for data exchange between ESP-NOW devices and MQTT bro
 2. Automatically adds supported devices configurations to Home Assistan via MQTT discovery.
 3. Update firmware from HTTPS server via OTA.
 4. Update firmware of supported devices from HTTPS server via ESP-NOW.
+5. Direct or mesh work mode.
 
 ## Notes
 
-1. ESP-NOW mesh network based on the [zh_network](http://git.zh.com.ru/alexey.zholtikov/zh_network).
-2. For initial settings use "menuconfig -> ZH Gateway Configuration".
-3. To restart the gateway, send the "restart" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7").
-4. To update the gateway firmware, send the "update" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7"). The update path should be like as "https://your_server/zh_gateway.bin". The online status of the update is displayed in the root gateway topic.
+1. All devices on the network must have the same work mode.
+2. ESP-NOW mesh network based on the [zh_network](http://git.zh.com.ru/alexey.zholtikov/zh_network).
+3. For initial settings use "menuconfig -> ZH Gateway Configuration".
+4. To restart the gateway, send the "restart" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7").
+5. To update the gateway firmware, send the "update" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7"). The update path should be like as "https://your_server/zh_gateway.bin". The online status of the update is displayed in the root gateway topic.
 
 ## Build and flash
 

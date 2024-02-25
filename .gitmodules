@@ -7,3 +7,9 @@
 [submodule "components/zh_espnow"]
 	path = components/zh_espnow
 	url = http://git.zh.com.ru/alexey.zholtikov/zh_espnow
+[submodule "components/zh_network"]
+	path = components/zh_network
+	url = http://git.zh.com.ru/alexey.zholtikov/zh_network
+[submodule "components/zh_vector"]
+	path = components/zh_vector
+	url = http://git.zh.com.ru/alexey.zholtikov/zh_vector
