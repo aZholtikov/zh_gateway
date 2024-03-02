@@ -773,7 +773,18 @@ static void s_zh_espnow_ota_update_task(void *pvParameter)
     esp_http_client_fetch_headers(https_client);
     data.payload_type = ZHPT_UPDATE_BEGIN;
     zh_send_message(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
-    xSemaphoreTake(s_espnow_data_semaphore, 30000 / portTICK_PERIOD_MS);
+    if (xSemaphoreTake(s_espnow_data_semaphore, 30000 / portTICK_PERIOD_MS) != pdTRUE)
+    {
+        esp_http_client_close(https_client);
+        esp_http_client_cleanup(https_client);
+        data.payload_type = ZHPT_UPDATE_ERROR;
+        zh_send_message(espnow_ota_data->mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+        s_espnow_ota_in_progress = false;
+        s_ota_message_part_number = 0;
+        esp_mqtt_client_publish(s_mqtt_client, topic, "update_error", 0, 2, true);
+        free(topic);
+        vTaskDelete(NULL);
+    }
     esp_mqtt_client_publish(s_mqtt_client, topic, "update_progress", 0, 2, true);
     for (;;)
     {
@@ -1183,6 +1194,7 @@ static void s_zh_espnow_sensor_send_mqtt_json_config_message(zh_espnow_data_t *d
 static void s_zh_espnow_sensor_send_mqtt_json_status_message(zh_espnow_data_t *device_data, uint8_t *device_mac)
 {
     char *temperature = (char *)calloc(1, 317);
+    char *humidity = (char *)calloc(1, 317);
     zh_json_t json;
     char buffer[512] = {0};
     zh_json_init(&json);
@@ -1191,6 +1203,13 @@ static void s_zh_espnow_sensor_send_mqtt_json_status_message(zh_espnow_data_t *d
     case HAST_DS18B20:
         sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
         zh_json_add(&json, "temperature", temperature);
+        break;
+    case HAST_DHT11:
+    case HAST_DHT22:
+        sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
+        sprintf(humidity, "%f", device_data->payload_data.status_message.sensor_status_message.humidity);
+        zh_json_add(&json, "temperature", temperature);
+        zh_json_add(&json, "humidity", humidity);
         break;
     default:
         break;
