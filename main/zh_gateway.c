@@ -13,15 +13,15 @@
 #include "esp_http_client.h"
 #include "esp_mac.h"
 #include "mqtt_client.h"
-#include "zh_espnow.h"
-#include "zh_network.h"
 #include "zh_json.h"
 #include "zh_config.h"
 
 #if CONFIG_NETWORK_TYPE_DIRECT
+#include "zh_espnow.h"
 #define zh_send_message(a, b, c) zh_espnow_send(a, b, c)
 #endif
 #if CONFIG_NETWORK_TYPE_MESH
+#include "zh_network.h"
 #define zh_send_message(a, b, c) zh_network_send(a, b, c)
 #endif
 
@@ -1205,6 +1205,11 @@ static void s_zh_espnow_sensor_send_mqtt_json_status_message(zh_espnow_data_t *d
         zh_json_add(&json, "temperature", temperature);
         break;
     case HAST_DHT11:
+        sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
+        sprintf(humidity, "%f", device_data->payload_data.status_message.sensor_status_message.humidity);
+        zh_json_add(&json, "temperature", temperature);
+        zh_json_add(&json, "humidity", humidity);
+        break;
     case HAST_DHT22:
         sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
         sprintf(humidity, "%f", device_data->payload_data.status_message.sensor_status_message.humidity);

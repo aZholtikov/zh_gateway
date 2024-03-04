@@ -4,7 +4,7 @@ Gateway for ESP32 ESP-IDF for data exchange between ESP-NOW devices and MQTT bro
 
 ## Tested on
 
-1. ESP32 ESP-IDF v5.1.0
+1. ESP32 ESP-IDF v5.2
 
 ## Features
 
@@ -32,7 +32,7 @@ bash <(curl -Ls http://git.zh.com.ru/alexey.zholtikov/zh_gateway/raw/branch/main
 cd zh_gateway
 idf.py menuconfig
 idf.py all
-idf.py -p (PORT) flash
+idf.py flash
 ```
 
 ## Attention
