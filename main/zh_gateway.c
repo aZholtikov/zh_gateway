@@ -1225,6 +1225,7 @@ static void s_zh_espnow_sensor_send_mqtt_json_status_message(zh_espnow_data_t *d
     sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(s_mqtt_client, topic, buffer, 0, 2, true);
     free(temperature);
+    free(humidity);
     free(topic);
 }
 
