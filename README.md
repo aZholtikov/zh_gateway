@@ -28,8 +28,10 @@ Run the following command to firmware build and flash module:
 
 ```text
 cd your_projects_folder
-bash <(curl -Ls http://git.zh.com.ru/alexey.zholtikov/zh_gateway/raw/branch/main/install.sh)
+git clone http://git.zh.com.ru/alexey.zholtikov/zh_gateway.git
 cd zh_gateway
+git submodule init
+git submodule update --remote
 idf.py menuconfig
 idf.py build
 idf.py flash
