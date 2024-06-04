@@ -1,0 +1,69 @@
+menu "ZH Gateway Configuration"
+	
+	choice NETWORK_TYPE
+		prompt "Network type"
+		help
+			Network type.
+		default NETWORK_TYPE_DIRECT
+		config NETWORK_TYPE_DIRECT
+			bool "DIRECT"
+		config NETWORK_TYPE_MESH
+			bool "MESH"
+	endchoice
+
+	choice CONNECTION_TYPE
+		prompt "Connection type"
+		help
+			Connection type.
+		default CONNECTION_TYPE_WIFI
+		config CONNECTION_TYPE_WIFI
+			bool "WIFI"
+		config CONNECTION_TYPE_LAN
+			bool "LAN"
+	endchoice
+
+	config WIFI_SSID_NAME
+		depends on CONNECTION_TYPE_WIFI
+		string "WiFi SSID name"
+		default "ssid"
+		help
+			WiFi SSID name.
+
+	config WIFI_PASSWORD
+		depends on CONNECTION_TYPE_WIFI
+		string "WiFi password"
+		default "password"
+		help
+			WiFi password.
+
+	config MQTT_BROKER_URL
+		string "MQTT broker url"
+		default "mqtt://mqttbroker.com"
+		help
+			MQTT broker url.
+
+	config MQTT_TOPIC_PREFIX
+		string "MQTT topic prefix"
+		default "homeassistant"
+		help
+			MQTT topic prefix.
+
+	config NTP_SERVER_URL
+		string "NTP server url"
+		default "ntpserver.com"
+		help
+			NTP server url.
+
+	config NTP_TIME_ZONE
+		string "NTP time zone"
+		default "UTC-3"
+		help
+			NTP time zone.
+
+	config FIRMWARE_UPGRADE_URL
+		string "Firmware upgrade url"
+		default "https://yourserver.com"
+		help
+			Firmware upgrade url. The certificate (certificate.pem) must match the upgrade server!
+
+endmenu 
