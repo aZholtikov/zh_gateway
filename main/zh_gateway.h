@@ -50,7 +50,7 @@
 #define MAC_STR "%02X-%02X-%02X-%02X-%02X-%02X"
 
 #define ZH_MESSAGE_TASK_PRIORITY 2 // Prioritize the task of sending messages to the MQTT.
-#define ZH_MESSAGE_STACK_SIZE 2048 // The stack size of the task of sending messages to the MQTT.
+#define ZH_MESSAGE_STACK_SIZE 3072 // The stack size of the task of sending messages to the MQTT.
 #define ZH_SNTP_TASK_PRIORITY 2    // Prioritize the task to get the current time.
 #define ZH_SNTP_STACK_SIZE 2048    // The stack size of the task to get the current time.
 #define ZH_OTA_TASK_PRIORITY 3     // Prioritize the task of OTA updates.
