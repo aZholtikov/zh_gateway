@@ -31,7 +31,8 @@
         .stack_size = 2048,             \
         .queue_size = 32,               \
         .wifi_interface = WIFI_IF_STA,  \
-        .wifi_channel = 1               \
+        .wifi_channel = 1,              \
+        .attempts = 3                   \
     }
 
 #ifdef __cplusplus
@@ -53,6 +54,7 @@ extern "C"
         uint8_t queue_size;              ///< Queue size for task for the ESP-NOW messages processing. @note The size depends on the number of messages to be processed. It is not recommended to set the value less than 16.
         wifi_interface_t wifi_interface; ///< WiFi interface (STA or AP) used for ESP-NOW operation. @note The MAC address of the device depends on the selected WiFi interface.
         uint8_t wifi_channel;            ///< Wi-Fi channel uses to send/receive ESP-NOW data. @note Values from 1 to 14.
+        uint8_t attempts;                ///< Maximum number of attempts to send a message. @note It is not recommended to set a value greater than 5.
     } zh_espnow_init_config_t;
 
     /// \cond

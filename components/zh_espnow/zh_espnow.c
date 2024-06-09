@@ -27,6 +27,7 @@ static QueueHandle_t _queue_handle = {0};
 static TaskHandle_t _processing_task_handle = {0};
 static zh_espnow_init_config_t _init_config = {0};
 static bool _is_initialized = false;
+static uint8_t _attempts = 0;
 
 /// \cond
 typedef struct
@@ -61,10 +62,21 @@ esp_err_t zh_espnow_init(const zh_espnow_init_config_t *config)
         ESP_LOGE(TAG, "ESP-NOW initialization fail. WiFi channel.");
         return ESP_ERR_INVALID_ARG;
     }
-    if (esp_wifi_set_channel(_init_config.wifi_channel, WIFI_SECOND_CHAN_NONE) != ESP_OK)
+    esp_err_t err = esp_wifi_set_channel(_init_config.wifi_channel, WIFI_SECOND_CHAN_NONE);
+    if (err == ESP_ERR_WIFI_NOT_INIT || err == ESP_ERR_WIFI_NOT_STARTED)
     {
         ESP_LOGE(TAG, "ESP-NOW initialization fail. WiFi not initialized.");
         return ESP_ERR_WIFI_NOT_INIT;
+    }
+    else if (err == ESP_FAIL)
+    {
+        uint8_t prim = 0;
+        wifi_second_chan_t sec = 0;
+        esp_wifi_get_channel(&prim, &sec);
+        if (prim != _init_config.wifi_channel)
+        {
+            ESP_LOGW(TAG, "ESP-NOW initialization warning. The device is connected to the router. Channel %d will be used for ESP-NOW.", prim);
+        }
     }
     _event_group_handle = xEventGroupCreate();
     _queue_handle = xQueueCreate(_init_config.queue_size, sizeof(_queue_t));
@@ -277,6 +289,8 @@ static void _processing(void *pvParameter)
             }
             memset(on_send, 0, sizeof(zh_espnow_event_on_send_t));
             memcpy(on_send->mac_addr, queue.data.mac_addr, 6);
+        SEND:
+            ++_attempts;
             err = esp_now_send(queue.data.mac_addr, queue.data.payload, queue.data.payload_len);
             if (err == ESP_ERR_ESPNOW_NO_MEM)
             {
@@ -305,11 +319,17 @@ static void _processing(void *pvParameter)
             {
                 ESP_LOGI(TAG, "Confirmation message received. ESP-NOW message to MAC %02X:%02X:%02X:%02X:%02X:%02X sent success.", MAC2STR(queue.data.mac_addr));
                 on_send->status = ZH_ESPNOW_SEND_SUCCESS;
+                _attempts = 0;
             }
             else
             {
+                if (_attempts < _init_config.attempts)
+                {
+                    goto SEND;
+                }
                 ESP_LOGE(TAG, "Confirmation message not received. ESP-NOW message to MAC %02X:%02X:%02X:%02X:%02X:%02X sent fail.", MAC2STR(queue.data.mac_addr));
                 on_send->status = ZH_ESPNOW_SEND_FAIL;
+                _attempts = 0;
             }
             ESP_LOGI(TAG, "Outgoing ESP-NOW data to MAC %02X:%02X:%02X:%02X:%02X:%02X processed success.", MAC2STR(queue.data.mac_addr));
             if (esp_event_post(ZH_ESPNOW, ZH_ESPNOW_ON_SEND_EVENT, on_send, sizeof(zh_espnow_event_on_send_t), portTICK_PERIOD_MS) != ESP_OK)
