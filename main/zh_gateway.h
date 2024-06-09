@@ -60,17 +60,23 @@
 
 typedef struct // Structure of data exchange between tasks, functions and event handlers.
 {
-    uint8_t self_mac[6];                            // Gateway MAC address. @note Depends at WiFi operation mode.
-    bool sntp_is_enable;                            // SNTP client operation status flag. @note Used to control the SNTP functions when the network connection is established / lost.
-    bool mqtt_is_enable;                            // MQTT client operation status flag. @note Used to control the MQTT functions when the network connection is established / lost.
-    bool mqtt_is_connected;                         // MQTT broker connection status flag. @note Used to control the gateway system tasks when the MQTT connection is established / lost.
-    esp_timer_handle_t wifi_reconnect_timer;        // Unique WiFi reconnection timer handle. @note Used when the number of attempts of unsuccessful connections is exceeded.
-    uint8_t wifi_reconnect_retry_num;               // System counter for the number of unsuccessful WiFi connection attempts.
-    esp_mqtt_client_handle_t mqtt_client;           // Unique MQTT client handle.
-    TaskHandle_t gateway_attributes_message_task;   // Unique task handle for zh_gateway_send_mqtt_json_attributes_message_task().
-    TaskHandle_t gateway_keep_alive_message_task;   // Unique task handle for zh_gateway_send_mqtt_json_keep_alive_message_task().
-    TaskHandle_t gateway_current_time_task;         // Unique task handle for zh_send_espnow_current_time_task().
-    zh_espnow_ota_data_t espnow_ota_data;           // Structure for initial transfer system data to the node update task.
+    uint8_t self_mac[6];                          // Gateway MAC address. @note Depends at WiFi operation mode.
+    bool sntp_is_enable;                          // SNTP client operation status flag. @note Used to control the SNTP functions when the network connection is established / lost.
+    bool mqtt_is_enable;                          // MQTT client operation status flag. @note Used to control the MQTT functions when the network connection is established / lost.
+    bool mqtt_is_connected;                       // MQTT broker connection status flag. @note Used to control the gateway system tasks when the MQTT connection is established / lost.
+    esp_timer_handle_t wifi_reconnect_timer;      // Unique WiFi reconnection timer handle. @note Used when the number of attempts of unsuccessful connections is exceeded.
+    uint8_t wifi_reconnect_retry_num;             // System counter for the number of unsuccessful WiFi connection attempts.
+    esp_mqtt_client_handle_t mqtt_client;         // Unique MQTT client handle.
+    TaskHandle_t gateway_attributes_message_task; // Unique task handle for zh_gateway_send_mqtt_json_attributes_message_task().
+    TaskHandle_t gateway_keep_alive_message_task; // Unique task handle for zh_gateway_send_mqtt_json_keep_alive_message_task().
+    TaskHandle_t gateway_current_time_task;       // Unique task handle for zh_send_espnow_current_time_task().
+    struct                                        // Structure for initial transfer system data to the node update task.
+    {
+        zh_device_type_t device_type; // ESP-NOW device type.
+        char app_name[32];            // Firmware application name.
+        char app_version[32];         // Firmware application version.
+        uint8_t mac_addr[6];          // ESP-NOW node MAC address.
+    } espnow_ota_data;
     SemaphoreHandle_t espnow_ota_data_semaphore;    // Semaphore for control the acknowledgement of successful receipt of an update package from a node.
     SemaphoreHandle_t self_ota_in_progress_mutex;   // Mutex blocking the second run of the gateway update task.
     SemaphoreHandle_t espnow_ota_in_progress_mutex; // Mutex blocking the second run of the node update task.

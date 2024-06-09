@@ -216,48 +216,47 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
             goto ZH_NETWORK_EVENT_HANDLER_EXIT;
         }
 #endif
-        zh_espnow_data_t data = {0};
-        memcpy(&data, recv_data->data, recv_data->data_len);
-        char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(data.device_type)) + 20, MALLOC_CAP_8BIT);
-        memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(data.device_type)) + 20);
-        sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(data.device_type), MAC2STR(recv_data->mac_addr));
-        switch (data.payload_type)
+        zh_espnow_data_t *data = (zh_espnow_data_t *)recv_data->data;
+        char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(data->device_type)) + 20, MALLOC_CAP_8BIT);
+        memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(data->device_type)) + 20);
+        sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(data->device_type), MAC2STR(recv_data->mac_addr));
+        switch (data->payload_type)
         {
         case ZHPT_ATTRIBUTES:
-            zh_espnow_send_mqtt_json_attributes_message(&data, recv_data->mac_addr, gateway_config);
+            zh_espnow_send_mqtt_json_attributes_message(data, recv_data->mac_addr, gateway_config);
             break;
         case ZHPT_KEEP_ALIVE:
-            zh_espnow_send_mqtt_json_keep_alive_message(&data, recv_data->mac_addr, gateway_config);
+            zh_espnow_send_mqtt_json_keep_alive_message(data, recv_data->mac_addr, gateway_config);
             break;
         case ZHPT_CONFIG:
-            switch (data.device_type)
+            switch (data->device_type)
             {
             case ZHDT_SWITCH:
-                zh_espnow_switch_send_mqtt_json_config_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_switch_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_LED:
-                zh_espnow_led_send_mqtt_json_config_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_led_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_SENSOR:
-                zh_espnow_sensor_send_mqtt_json_config_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_sensor_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_BINARY_SENSOR:
-                zh_espnow_binary_sensor_send_mqtt_json_config_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_binary_sensor_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             default:
                 break;
             }
             break;
         case ZHPT_HARDWARE:
-            switch (data.device_type)
+            switch (data->device_type)
             {
             case ZHDT_SWITCH:
-                zh_espnow_switch_send_mqtt_json_hardware_config_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_switch_send_mqtt_json_hardware_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_LED:
                 break;
             case ZHDT_SENSOR:
-                zh_espnow_sensor_send_mqtt_json_hardware_config_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_sensor_send_mqtt_json_hardware_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_BINARY_SENSOR:
                 break;
@@ -266,19 +265,19 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
             }
             break;
         case ZHPT_STATE:
-            switch (data.device_type)
+            switch (data->device_type)
             {
             case ZHDT_SWITCH:
-                zh_espnow_switch_send_mqtt_json_status_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_switch_send_mqtt_json_status_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_LED:
-                zh_espnow_led_send_mqtt_json_status_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_led_send_mqtt_json_status_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_SENSOR:
-                zh_espnow_sensor_send_mqtt_json_status_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_sensor_send_mqtt_json_status_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_BINARY_SENSOR:
-                zh_espnow_binary_sensor_send_mqtt_json_status_message(&data, recv_data->mac_addr, gateway_config);
+                zh_espnow_binary_sensor_send_mqtt_json_status_message(data, recv_data->mac_addr, gateway_config);
                 break;
             default:
                 break;
@@ -287,10 +286,9 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
         case ZHPT_UPDATE:
             if (xSemaphoreTake(gateway_config->espnow_ota_in_progress_mutex, portTICK_PERIOD_MS) == pdTRUE)
             {
-                gateway_config->espnow_ota_data.chip_type = data.payload_data.espnow_ota_message.chip_type;
-                gateway_config->espnow_ota_data.device_type = data.device_type;
-                memcpy(gateway_config->espnow_ota_data.app_name, &data.payload_data.espnow_ota_message.app_name, sizeof(data.payload_data.espnow_ota_message.app_name));
-                memcpy(gateway_config->espnow_ota_data.app_version, &data.payload_data.espnow_ota_message.app_version, sizeof(data.payload_data.espnow_ota_message.app_version));
+                gateway_config->espnow_ota_data.device_type = data->device_type;
+                memcpy(gateway_config->espnow_ota_data.app_name, data->payload_data.ota_message.espnow_ota_data.app_name, sizeof(data->payload_data.ota_message.espnow_ota_data.app_name));
+                memcpy(gateway_config->espnow_ota_data.app_version, data->payload_data.ota_message.espnow_ota_data.app_version, sizeof(data->payload_data.ota_message.espnow_ota_data.app_version));
                 memcpy(gateway_config->espnow_ota_data.mac_addr, recv_data->mac_addr, 6);
                 xTaskCreatePinnedToCore(&zh_espnow_ota_update_task, "NULL", ZH_OTA_STACK_SIZE, gateway_config, ZH_OTA_TASK_PRIORITY, NULL, tskNO_AFFINITY);
                 xSemaphoreGive(gateway_config->espnow_ota_in_progress_mutex);
@@ -358,19 +356,17 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
         {
             vTaskDelete(gateway_config->gateway_attributes_message_task);
             vTaskDelete(gateway_config->gateway_keep_alive_message_task);
-            zh_keep_alive_message_t keep_alive_message = {0};
-            keep_alive_message.online_status = ZH_OFFLINE;
             zh_espnow_data_t data = {0};
             data.device_type = ZHDT_GATEWAY;
             data.payload_type = ZHPT_KEEP_ALIVE;
-            data.payload_data = (zh_payload_data_t)keep_alive_message;
+            data.payload_data.keep_alive_message.online_status = ZH_OFFLINE;
             zh_send_message(NULL, (uint8_t *)&data, sizeof(zh_espnow_data_t));
         }
         gateway_config->mqtt_is_connected = false;
         break;
     case MQTT_EVENT_DATA:
         char incoming_topic[(event->topic_len) + 1];
-        memset(&incoming_topic, 0, sizeof(incoming_topic));
+        memset(incoming_topic, 0, sizeof(incoming_topic));
         strncat(incoming_topic, event->topic, event->topic_len);
         uint8_t incoming_data_mac[6] = {0};
         zh_device_type_t incoming_data_device_type = ZHDT_NONE;
@@ -412,22 +408,16 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             }
         }
         char incoming_payload[(event->data_len) + 1];
-        memset(&incoming_payload, 0, sizeof(incoming_payload));
+        memset(incoming_payload, 0, sizeof(incoming_payload));
         strncat(incoming_payload, event->data, event->data_len);
         zh_espnow_data_t data = {0};
         data.device_type = ZHDT_GATEWAY;
-        zh_status_message_t status_message = {0};
-        zh_switch_status_message_t switch_status_message = {0};
-        zh_led_status_message_t led_status_message = {0};
-        zh_config_message_t config_message = {0};
-        zh_switch_hardware_config_message_t switch_hardware_config_message = {0};
-        zh_sensor_hardware_config_message_t sensor_hardware_config_message = {0};
         switch (incoming_data_device_type)
         {
         case ZHDT_GATEWAY:
             if (incoming_data_payload_type == ZHPT_NONE)
             {
-                if (memcmp(&gateway_config->self_mac, &incoming_data_mac, 6) == 0)
+                if (memcmp(gateway_config->self_mac, incoming_data_mac, 6) == 0)
                 {
                     if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0)
                     {
@@ -472,10 +462,8 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 {
                     if (strncmp(incoming_payload, zh_get_on_off_type_value_name(i), strlen(incoming_payload) + 1) == 0)
                     {
-                        switch_status_message.status = i;
-                        status_message = (zh_status_message_t)switch_status_message;
+                        data.payload_data.status_message.switch_status_message.status = i;
                         data.payload_type = ZHPT_SET;
-                        data.payload_data = (zh_payload_data_t)status_message;
                         zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                         break;
                     }
@@ -487,64 +475,62 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 {
                     break;
                 }
-                switch_hardware_config_message.relay_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.switch_hardware_config_message.relay_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract relay on level value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                switch_hardware_config_message.relay_on_level = zh_bool_value_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.switch_hardware_config_message.relay_on_level = zh_bool_value_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract led gpio number value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                switch_hardware_config_message.led_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.switch_hardware_config_message.led_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract led on level value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                switch_hardware_config_message.led_on_level = zh_bool_value_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.switch_hardware_config_message.led_on_level = zh_bool_value_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract internal button GPIO number value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                switch_hardware_config_message.int_button_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.switch_hardware_config_message.int_button_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract internal button on level value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                switch_hardware_config_message.int_button_on_level = zh_bool_value_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.switch_hardware_config_message.int_button_on_level = zh_bool_value_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract external button GPIO number value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                switch_hardware_config_message.ext_button_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.switch_hardware_config_message.ext_button_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract external button on level value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                switch_hardware_config_message.ext_button_on_level = zh_bool_value_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.switch_hardware_config_message.ext_button_on_level = zh_bool_value_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract sensor GPIO number value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                switch_hardware_config_message.sensor_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.switch_hardware_config_message.sensor_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract sensor type value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                switch_hardware_config_message.sensor_type = zh_sensor_type_check(atoi(extracted_hardware_data));
-                config_message = (zh_config_message_t)switch_hardware_config_message;
+                data.payload_data.config_message.switch_hardware_config_message.sensor_type = zh_sensor_type_check(atoi(extracted_hardware_data));
                 data.payload_type = ZHPT_HARDWARE;
-                data.payload_data = (zh_payload_data_t)config_message;
                 zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 break;
             default:
@@ -575,27 +561,21 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 {
                     if (strncmp(incoming_payload, zh_get_on_off_type_value_name(i), strlen(incoming_payload) + 1) == 0)
                     {
-                        led_status_message.status = i;
-                        status_message = (zh_status_message_t)led_status_message;
+                        data.payload_data.status_message.led_status_message.status = i;
                         data.payload_type = ZHPT_SET;
-                        data.payload_data = (zh_payload_data_t)status_message;
                         zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                         break;
                     }
                 }
                 break;
             case ZHPT_BRIGHTNESS:
-                led_status_message.brightness = atoi(incoming_payload);
-                status_message = (zh_status_message_t)led_status_message;
+                data.payload_data.status_message.led_status_message.brightness = atoi(incoming_payload);
                 data.payload_type = ZHPT_BRIGHTNESS;
-                data.payload_data = (zh_payload_data_t)status_message;
                 zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 break;
             case ZHPT_TEMPERATURE:
-                led_status_message.temperature = atoi(incoming_payload);
-                status_message = (zh_status_message_t)led_status_message;
+                data.payload_data.status_message.led_status_message.temperature = atoi(incoming_payload);
                 data.payload_type = ZHPT_TEMPERATURE;
-                data.payload_data = (zh_payload_data_t)status_message;
                 zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 break;
             case ZHPT_RGB:
@@ -604,22 +584,20 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 {
                     break;
                 }
-                led_status_message.red = atoi(extracted_rgb_data);
+                data.payload_data.status_message.led_status_message.red = atoi(extracted_rgb_data);
                 extracted_rgb_data = strtok(NULL, ","); // Extract green value.
                 if (extracted_rgb_data == NULL)
                 {
                     break;
                 }
-                led_status_message.green = atoi(extracted_rgb_data);
+                data.payload_data.status_message.led_status_message.green = atoi(extracted_rgb_data);
                 extracted_rgb_data = strtok(NULL, ","); // Extract blue value.
                 if (extracted_rgb_data == NULL)
                 {
                     break;
                 }
-                led_status_message.blue = atoi(extracted_rgb_data);
-                status_message = (zh_status_message_t)led_status_message;
+                data.payload_data.status_message.led_status_message.blue = atoi(extracted_rgb_data);
                 data.payload_type = ZHPT_RGB;
-                data.payload_data = (zh_payload_data_t)status_message;
                 zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 break;
             default:
@@ -651,40 +629,38 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 {
                     break;
                 }
-                sensor_hardware_config_message.sensor_type = zh_sensor_type_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.sensor_hardware_config_message.sensor_type = zh_sensor_type_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract sensor GPIO number 1 value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                sensor_hardware_config_message.sensor_pin_1 = zh_gpio_number_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.sensor_hardware_config_message.sensor_pin_1 = zh_gpio_number_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract sensor GPIO number 2 value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                sensor_hardware_config_message.sensor_pin_2 = zh_gpio_number_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.sensor_hardware_config_message.sensor_pin_2 = zh_gpio_number_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract sensor power control GPIO number value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                sensor_hardware_config_message.power_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.sensor_hardware_config_message.power_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract sensor measurement frequency value.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                sensor_hardware_config_message.measurement_frequency = zh_uint16_value_check(atoi(extracted_hardware_data));
+                data.payload_data.config_message.sensor_hardware_config_message.measurement_frequency = zh_uint16_value_check(atoi(extracted_hardware_data));
                 extracted_hardware_data = strtok(NULL, ","); // Extract power mode.
                 if (extracted_hardware_data == NULL)
                 {
                     break;
                 }
-                sensor_hardware_config_message.battery_power = zh_bool_value_check(atoi(extracted_hardware_data));
-                config_message = (zh_config_message_t)sensor_hardware_config_message;
+                data.payload_data.config_message.sensor_hardware_config_message.battery_power = zh_bool_value_check(atoi(extracted_hardware_data));
                 data.payload_type = ZHPT_HARDWARE;
-                data.payload_data = (zh_payload_data_t)config_message;
                 zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 break;
             default:
@@ -793,14 +769,13 @@ void zh_espnow_ota_update_task(void *pvParameter)
 {
     gateway_config_t *gateway_config = pvParameter;
     xSemaphoreTake(gateway_config->espnow_ota_in_progress_mutex, portMAX_DELAY);
-    zh_espnow_ota_message_t espnow_ota_message = {0};
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
     char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type)) + 20, MALLOC_CAP_8BIT);
     memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type)) + 20);
     sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), MAC2STR(gateway_config->espnow_ota_data.mac_addr));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_begin", 0, 2, true);
-    char espnow_ota_write_data[sizeof(espnow_ota_message.data) + 1] = {0};
+    char espnow_ota_write_data[sizeof(data.payload_data.ota_message.espnow_ota_message.data) + 1] = {0};
     char *app_name = (char *)heap_caps_malloc(strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(gateway_config->espnow_ota_data.app_name) + 6, MALLOC_CAP_8BIT);
     memset(app_name, 0, strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(gateway_config->espnow_ota_data.app_name) + 6);
     sprintf(app_name, "%s/%s.bin", CONFIG_FIRMWARE_UPGRADE_URL, gateway_config->espnow_ota_data.app_name);
@@ -831,7 +806,7 @@ void zh_espnow_ota_update_task(void *pvParameter)
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_progress", 0, 2, true);
     for (;;)
     {
-        int data_read_size = esp_http_client_read(https_client, espnow_ota_write_data, sizeof(espnow_ota_message.data));
+        int data_read_size = esp_http_client_read(https_client, espnow_ota_write_data, sizeof(data.payload_data.ota_message.espnow_ota_message.data));
         if (data_read_size < 0)
         {
             esp_http_client_close(https_client);
@@ -843,11 +818,10 @@ void zh_espnow_ota_update_task(void *pvParameter)
         }
         else if (data_read_size > 0)
         {
-            espnow_ota_message.data_len = data_read_size;
-            ++espnow_ota_message.part;
-            memcpy(&espnow_ota_message.data, &espnow_ota_write_data, data_read_size);
+            data.payload_data.ota_message.espnow_ota_message.data_len = data_read_size;
+            ++data.payload_data.ota_message.espnow_ota_message.part;
+            memcpy(data.payload_data.ota_message.espnow_ota_message.data, espnow_ota_write_data, data_read_size);
             data.payload_type = ZHPT_UPDATE_PROGRESS;
-            data.payload_data = (zh_payload_data_t)espnow_ota_message;
             zh_send_message(gateway_config->espnow_ota_data.mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
             if (xSemaphoreTake(gateway_config->espnow_ota_data_semaphore, 10000 / portTICK_PERIOD_MS) != pdTRUE)
             {
@@ -918,22 +892,20 @@ void zh_gateway_send_mqtt_json_attributes_message_task(void *pvParameter)
 {
     gateway_config_t *gateway_config = pvParameter;
     const esp_app_desc_t *app_info = esp_app_get_description();
-    zh_attributes_message_t attributes_message = {0};
-    attributes_message.chip_type = ZH_CHIP_TYPE;
-    strcpy(attributes_message.flash_size, CONFIG_ESPTOOLPY_FLASHSIZE);
-    attributes_message.cpu_frequency = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
-    attributes_message.reset_reason = (uint8_t)esp_reset_reason();
-    strcpy(attributes_message.app_name, app_info->project_name);
-    strcpy(attributes_message.app_version, app_info->version);
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
     data.payload_type = ZHPT_ATTRIBUTES;
+    data.payload_data.attributes_message.chip_type = ZH_CHIP_TYPE;
+    strcpy(data.payload_data.attributes_message.flash_size, CONFIG_ESPTOOLPY_FLASHSIZE);
+    data.payload_data.attributes_message.cpu_frequency = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
+    data.payload_data.attributes_message.reset_reason = (uint8_t)esp_reset_reason();
+    strcpy(data.payload_data.attributes_message.app_name, app_info->project_name);
+    strcpy(data.payload_data.attributes_message.app_version, app_info->version);
     for (;;)
     {
-        attributes_message.heap_size = esp_get_free_heap_size();
-        attributes_message.min_heap_size = esp_get_minimum_free_heap_size();
-        attributes_message.uptime = esp_timer_get_time() / 1000000;
-        data.payload_data = (zh_payload_data_t)attributes_message;
+        data.payload_data.attributes_message.heap_size = esp_get_free_heap_size();
+        data.payload_data.attributes_message.min_heap_size = esp_get_minimum_free_heap_size();
+        data.payload_data.attributes_message.uptime = esp_timer_get_time() / 1000000;
         zh_espnow_send_mqtt_json_attributes_message(&data, gateway_config->self_mac, gateway_config);
         vTaskDelay(60000 / portTICK_PERIOD_MS);
     }
@@ -942,44 +914,34 @@ void zh_gateway_send_mqtt_json_attributes_message_task(void *pvParameter)
 
 void zh_gateway_send_mqtt_json_config_message(const gateway_config_t *gateway_config)
 {
-    zh_binary_sensor_config_message_t binary_sensor_config_message = {0};
-    binary_sensor_config_message.unique_id = 1;
-    binary_sensor_config_message.binary_sensor_device_class = HABSDC_CONNECTIVITY;
-    binary_sensor_config_message.payload_on = HAONOFT_CONNECT;
-    binary_sensor_config_message.payload_off = HAONOFT_NONE;
-    binary_sensor_config_message.expire_after = 30;
-    binary_sensor_config_message.enabled_by_default = true;
-    binary_sensor_config_message.force_update = true;
-    binary_sensor_config_message.qos = 2;
-    binary_sensor_config_message.retain = true;
-    zh_config_message_t config_message = {0};
-    config_message = (zh_config_message_t)binary_sensor_config_message;
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
     data.payload_type = ZHPT_CONFIG;
-    data.payload_data = (zh_payload_data_t)config_message;
+    data.payload_data.config_message.binary_sensor_config_message.unique_id = 1;
+    data.payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class = HABSDC_CONNECTIVITY;
+    data.payload_data.config_message.binary_sensor_config_message.payload_on = HAONOFT_CONNECT;
+    data.payload_data.config_message.binary_sensor_config_message.payload_off = HAONOFT_NONE;
+    data.payload_data.config_message.binary_sensor_config_message.expire_after = 30;
+    data.payload_data.config_message.binary_sensor_config_message.enabled_by_default = true;
+    data.payload_data.config_message.binary_sensor_config_message.force_update = true;
+    data.payload_data.config_message.binary_sensor_config_message.qos = 2;
+    data.payload_data.config_message.binary_sensor_config_message.retain = true;
     zh_espnow_binary_sensor_send_mqtt_json_config_message(&data, gateway_config->self_mac, gateway_config);
 }
 
 void zh_gateway_send_mqtt_json_keep_alive_message_task(void *pvParameter)
 {
     gateway_config_t *gateway_config = pvParameter;
-    zh_keep_alive_message_t keep_alive_message = {0};
-    keep_alive_message.online_status = ZH_ONLINE;
-    zh_binary_sensor_status_message_t binary_sensor_status_message = {0};
-    binary_sensor_status_message.sensor_type = HAST_GATEWAY;
-    binary_sensor_status_message.connect = HAONOFT_CONNECT;
-    zh_status_message_t status_message = {0};
-    status_message = (zh_status_message_t)binary_sensor_status_message;
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
+    data.payload_data.keep_alive_message.online_status = ZH_ONLINE;
+    data.payload_data.status_message.binary_sensor_status_message.sensor_type = HAST_GATEWAY;
+    data.payload_data.status_message.binary_sensor_status_message.connect = HAONOFT_CONNECT;
     for (;;)
     {
         data.payload_type = ZHPT_KEEP_ALIVE;
-        data.payload_data = (zh_payload_data_t)keep_alive_message;
         zh_send_message(NULL, (uint8_t *)&data, sizeof(zh_espnow_data_t));
         data.payload_type = ZHPT_STATE;
-        data.payload_data = (zh_payload_data_t)status_message;
         zh_espnow_binary_sensor_send_mqtt_json_status_message(&data, gateway_config->self_mac, gateway_config);
         vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
@@ -1077,7 +1039,7 @@ void zh_espnow_switch_send_mqtt_json_config_message(const zh_espnow_data_t *devi
     memset(qos, 0, 4);
     sprintf(qos, "%d", device_data->payload_data.config_message.switch_config_message.qos);
     zh_json_t json = {0};
-    char buffer[512] = {0};
+    char buffer[1024] = {0};
     zh_json_init(&json);
     zh_json_add(&json, "platform", "mqtt");
     zh_json_add(&json, "name", name);

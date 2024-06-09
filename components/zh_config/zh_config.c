@@ -144,22 +144,6 @@ char *zh_get_chip_type_value_name(ha_chip_type_t value)
     return "";
 }
 
-char *zh_get_led_type_value_name(ha_led_type_t value)
-{
-    switch (value)
-    {
-#define DF(_value, _name) \
-    case _value:          \
-        return _name;
-        HA_LED_TYPE
-#undef DF
-        break;
-    default:
-        break;
-    }
-    return "";
-}
-
 char *zh_get_sensor_type_value_name(ha_sensor_type_t value)
 {
     switch (value)
