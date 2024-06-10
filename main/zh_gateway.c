@@ -75,6 +75,8 @@ void app_main(void)
     gateway_config->espnow_ota_data_semaphore = xSemaphoreCreateBinary();
     gateway_config->self_ota_in_progress_mutex = xSemaphoreCreateMutex();
     gateway_config->espnow_ota_in_progress_mutex = xSemaphoreCreateMutex();
+    gateway_config->device_check_in_progress_mutex = xSemaphoreCreateMutex();
+    zh_vector_init(&gateway_config->available_device_vector, sizeof(available_device_t), false);
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_ota_img_states_t ota_state = {0};
     esp_ota_get_state_partition(running, &ota_state);
@@ -226,6 +228,24 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
             zh_espnow_send_mqtt_json_attributes_message(data, recv_data->mac_addr, gateway_config);
             break;
         case ZHPT_KEEP_ALIVE:
+            if (xSemaphoreTake(gateway_config->device_check_in_progress_mutex, portTICK_PERIOD_MS) == pdTRUE)
+            {
+                for (uint16_t i = 0; i < zh_vector_get_size(&gateway_config->available_device_vector); ++i)
+                {
+                    available_device_t *available_device = zh_vector_get_item(&gateway_config->available_device_vector, i);
+                    if (memcmp(recv_data->mac_addr, available_device->mac_addr, 6) == 0)
+                    {
+                        zh_vector_delete_item(&gateway_config->available_device_vector, i);
+                    }
+                }
+                available_device_t available_device = {0};
+                available_device.device_type = data->device_type;
+                memcpy(available_device.mac_addr, recv_data->mac_addr, 6);
+                available_device.frequency = data->payload_data.keep_alive_message.message_frequency;
+                available_device.time = esp_timer_get_time() / 1000000;
+                zh_vector_push_back(&gateway_config->available_device_vector, &available_device);
+                xSemaphoreGive(gateway_config->device_check_in_progress_mutex);
+            }
             zh_espnow_send_mqtt_json_keep_alive_message(data, recv_data->mac_addr, gateway_config);
             break;
         case ZHPT_CONFIG:
@@ -348,6 +368,7 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             zh_gateway_send_mqtt_json_config_message(gateway_config);
             xTaskCreatePinnedToCore(&zh_gateway_send_mqtt_json_attributes_message_task, "NULL", ZH_MESSAGE_STACK_SIZE, gateway_config, ZH_MESSAGE_TASK_PRIORITY, (TaskHandle_t *)&gateway_config->gateway_attributes_message_task, tskNO_AFFINITY);
             xTaskCreatePinnedToCore(&zh_gateway_send_mqtt_json_keep_alive_message_task, "NULL", ZH_MESSAGE_STACK_SIZE, gateway_config, ZH_MESSAGE_TASK_PRIORITY, (TaskHandle_t *)&gateway_config->gateway_keep_alive_message_task, tskNO_AFFINITY);
+            xTaskCreatePinnedToCore(&zh_device_availability_check_task, "NULL", ZH_CHECK_STACK_SIZE, gateway_config, ZH_CHECK_TASK_PRIORITY, (TaskHandle_t *)&gateway_config->device_availability_check_task, tskNO_AFFINITY);
         }
         gateway_config->mqtt_is_connected = true;
         break;
@@ -356,6 +377,7 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
         {
             vTaskDelete(gateway_config->gateway_attributes_message_task);
             vTaskDelete(gateway_config->gateway_keep_alive_message_task);
+            vTaskDelete(gateway_config->device_availability_check_task);
             zh_espnow_data_t data = {0};
             data.device_type = ZHDT_GATEWAY;
             data.payload_type = ZHPT_KEEP_ALIVE;
@@ -864,6 +886,37 @@ void zh_send_espnow_current_time_task(void *pvParameter)
         time(&now);
         // To Do.
         vTaskDelay(86400000 / portTICK_PERIOD_MS);
+    }
+    vTaskDelete(NULL);
+}
+
+void zh_device_availability_check_task(void *pvParameter)
+{
+    gateway_config_t *gateway_config = pvParameter;
+    for (;;)
+    {
+        xSemaphoreTake(gateway_config->device_check_in_progress_mutex, portMAX_DELAY);
+        for (uint16_t i = 0; i < zh_vector_get_size(&gateway_config->available_device_vector); ++i)
+        {
+        CHECK:
+            available_device_t *available_device = zh_vector_get_item(&gateway_config->available_device_vector, i);
+            if (available_device == NULL)
+            {
+                break;
+            }
+            if (esp_timer_get_time() / 1000000 > available_device->time + (available_device->frequency * 3))
+            {
+                char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(available_device->device_type)) + 27, MALLOC_CAP_8BIT);
+                memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(available_device->device_type)) + 27);
+                sprintf(topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(available_device->device_type), MAC2STR(available_device->mac_addr));
+                esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "offline", 0, 2, true);
+                heap_caps_free(topic);
+                zh_vector_delete_item(&gateway_config->available_device_vector, i);
+                goto CHECK; // Since the vector is shifted after item deletion, the item needs to be re-checked.
+            }
+        }
+        xSemaphoreGive(gateway_config->device_check_in_progress_mutex);
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
     vTaskDelete(NULL);
 }

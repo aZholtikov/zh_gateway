@@ -16,6 +16,7 @@
 #include "esp_mac.h"
 #include "mqtt_client.h"
 #include "zh_json.h"
+#include "zh_vector.h"
 #include "zh_config.h"
 
 #ifdef CONFIG_NETWORK_TYPE_DIRECT
@@ -53,6 +54,8 @@
 #define ZH_MESSAGE_STACK_SIZE 3072 // The stack size of the task of sending messages to the MQTT.
 #define ZH_SNTP_TASK_PRIORITY 2    // Prioritize the task to get the current time.
 #define ZH_SNTP_STACK_SIZE 2048    // The stack size of the task to get the current time.
+#define ZH_CHECK_TASK_PRIORITY 2   // Prioritize the task to checking device availability.
+#define ZH_CHECK_STACK_SIZE 2048   // The stack size of the task to checking device availability.
 #define ZH_OTA_TASK_PRIORITY 3     // Prioritize the task of OTA updates.
 #define ZH_OTA_STACK_SIZE 8192     // The stack size of the task of OTA updates.
 
@@ -70,6 +73,7 @@ typedef struct // Structure of data exchange between tasks, functions and event 
     TaskHandle_t gateway_attributes_message_task; // Unique task handle for zh_gateway_send_mqtt_json_attributes_message_task().
     TaskHandle_t gateway_keep_alive_message_task; // Unique task handle for zh_gateway_send_mqtt_json_keep_alive_message_task().
     TaskHandle_t gateway_current_time_task;       // Unique task handle for zh_send_espnow_current_time_task().
+    TaskHandle_t device_availability_check_task;  // Unique task handle for zh_device_availability_check_task().
     struct                                        // Structure for initial transfer system data to the node update task.
     {
         zh_device_type_t device_type; // ESP-NOW device type.
@@ -77,10 +81,20 @@ typedef struct // Structure of data exchange between tasks, functions and event 
         char app_version[32];         // Firmware application version.
         uint8_t mac_addr[6];          // ESP-NOW node MAC address.
     } espnow_ota_data;
-    SemaphoreHandle_t espnow_ota_data_semaphore;    // Semaphore for control the acknowledgement of successful receipt of an update package from a node.
-    SemaphoreHandle_t self_ota_in_progress_mutex;   // Mutex blocking the second run of the gateway update task.
-    SemaphoreHandle_t espnow_ota_in_progress_mutex; // Mutex blocking the second run of the node update task.
+    SemaphoreHandle_t espnow_ota_data_semaphore;      // Semaphore for control the acknowledgement of successful receipt of an update package from a node.
+    SemaphoreHandle_t self_ota_in_progress_mutex;     // Mutex blocking the second run of the gateway update task.
+    SemaphoreHandle_t espnow_ota_in_progress_mutex;   // Mutex blocking the second run of the node update task.
+    SemaphoreHandle_t device_check_in_progress_mutex; // Mutex blocking the second access to the vector for struct for storing data about available nodes.
+    zh_vector_t available_device_vector;              // Vector for struct for storing data about available nodes.
 } gateway_config_t;
+
+typedef struct // Struct for storing data about available nodes.
+{
+    zh_device_type_t device_type; // ESP-NOW device type.
+    uint8_t mac_addr[6];          // ESP-NOW node MAC address.
+    uint8_t frequency;            // Keep alive message frequency.
+    uint64_t time;                // Last keep alive message time.
+} available_device_t;
 
 extern const uint8_t server_certificate_pem_start[] asm("_binary_certificate_pem_start");
 extern const uint8_t server_certificate_pem_end[] asm("_binary_certificate_pem_end");
@@ -136,6 +150,13 @@ void zh_espnow_ota_update_task(void *pvParameter);
  * @param[in,out] pvParameter Pointer to the structure of data exchange between tasks, functions and event handlers.
  */
 void zh_send_espnow_current_time_task(void *pvParameter);
+
+/**
+ * @brief The task of checking device availability and sending a message to the MQTT broker in case of unavailability.
+ *
+ * @param[in,out] pvParameter Pointer to the structure of data exchange between tasks, functions and event handlers.
+ */
+void zh_device_availability_check_task(void *pvParameter);
 
 /**
  * @brief Function for checking the correctness of the GPIO number value.
