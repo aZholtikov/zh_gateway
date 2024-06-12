@@ -43,8 +43,10 @@
 #define ZH_CHIP_TYPE HACHT_ESP32C6
 #endif
 
-#define ZH_LAN_MODULE_TYPE(x) esp_eth_phy_new_rtl8201(x) // Change it according to the LAN module used.
-#define ZH_LAN_MODULE_POWER_PIN GPIO_NUM_12              // Change it according to the LAN module used.
+#define ZH_LAN_MODULE_TYPE(x) esp_eth_phy_new_rtl8201(x) // For LILYGO T-ETH-Lite ESP32.
+#define ZH_LAN_MODULE_POWER_PIN GPIO_NUM_12              // For LILYGO T-ETH-Lite ESP32.
+// #define ZH_LAN_MODULE_TYPE(x) esp_eth_phy_new_lan87xx(x) // For Wireless-Tag WT32-ETH01.
+// #define ZH_LAN_MODULE_POWER_PIN GPIO_NUM_16              // For Wireless-Tag WT32-ETH01.
 
 #define ZH_WIFI_MAXIMUM_RETRY 5  // Maximum number of unsuccessful WiFi connection attempts.
 #define ZH_WIFI_RECONNECT_TIME 5 // Waiting time (in seconds) between attempts to reconnect to WiFi (if number of attempts of unsuccessful connections is exceeded).
@@ -63,6 +65,17 @@
 
 typedef struct // Structure of data exchange between tasks, functions and event handlers.
 {
+    struct // Storage structure of gateway configuration data.
+    {
+        bool is_lan_mode;              // Ethernet work mode flag.
+        char ssid_name[32];            // WiFi SSID name.
+        char ssid_password[64];        // WiFi password.
+        char mqtt_broker_url[64];      // MQTT broker url.
+        char mqtt_topic_prefix[32];    // MQTT topic prefix.
+        char ntp_server_url[64];       // NTP server url.
+        char ntp_time_zone[10];        // NTP time zone.
+        char firmware_upgrade_url[64]; // Firmware upgrade url.
+    } software_config;
     uint8_t self_mac[6];                          // Gateway MAC address. @note Depends at WiFi operation mode.
     bool sntp_is_enable;                          // SNTP client operation status flag. @note Used to control the SNTP functions when the network connection is established / lost.
     bool mqtt_is_enable;                          // MQTT client operation status flag. @note Used to control the MQTT functions when the network connection is established / lost.
@@ -99,21 +112,34 @@ typedef struct // Struct for storing data about available nodes.
 extern const uint8_t server_certificate_pem_start[] asm("_binary_certificate_pem_start");
 extern const uint8_t server_certificate_pem_end[] asm("_binary_certificate_pem_end");
 
-#ifdef CONFIG_CONNECTION_TYPE_LAN
+/**
+ * @brief Function for loading the gateway configuration from NVS memory.
+ *
+ * @param[out] switch_config Pointer to structure of data exchange between tasks, functions and event handlers.
+ */
+void zh_load_config(gateway_config_t *gateway_config);
+
+/**
+ * @brief Function for saving the gateway configuration to NVS memory.
+ *
+ * @param[in] switch_config Pointer to structure of data exchange between tasks, functions and event handlers.
+ */
+void zh_save_config(const gateway_config_t *gateway_config);
+
 /**
  * @brief Function for LAN event processing.
  *
  * @param[in,out] arg Pointer to the structure of data exchange between tasks, functions and event handlers.
  */
 void zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-#else
+
 /**
  * @brief Function for WiFi event processing.
  *
  * @param[in,out] arg Pointer to the structure of data exchange between tasks, functions and event handlers.
  */
 void zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-#endif
+
 /**
  * @brief Function for ESP-NOW event processing
  *

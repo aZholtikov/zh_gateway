@@ -8,67 +8,70 @@ void app_main(void)
     nvs_flash_init();
     esp_netif_init();
     esp_event_loop_create_default();
-#ifdef CONFIG_CONNECTION_TYPE_LAN
-    gpio_config_t config = {0};
-    config.intr_type = GPIO_INTR_DISABLE;
-    config.mode = GPIO_MODE_OUTPUT;
-    config.pin_bit_mask = (1ULL << ZH_LAN_MODULE_POWER_PIN);
-    config.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    config.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&config);
-    gpio_set_level(ZH_LAN_MODULE_POWER_PIN, 1);
-    esp_netif_config_t esp_netif_config = ESP_NETIF_DEFAULT_ETH();
-    esp_netif_t *esp_netif_eth = esp_netif_new(&esp_netif_config);
-    eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
-    eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
-    eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
-    esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
-    esp_eth_phy_t *phy = ZH_LAN_MODULE_TYPE(&phy_config);
-    esp_eth_config_t esp_eth_config = ETH_DEFAULT_CONFIG(mac, phy);
-    esp_eth_handle_t esp_eth_handle = NULL;
-    esp_eth_driver_install(&esp_eth_config, &esp_eth_handle);
-    esp_netif_attach(esp_netif_eth, esp_eth_new_netif_glue(esp_eth_handle));
-    esp_event_handler_instance_register(ETH_EVENT, ESP_EVENT_ANY_ID, &zh_eth_event_handler, gateway_config, NULL);
-    esp_event_handler_instance_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &zh_eth_event_handler, gateway_config, NULL);
-    esp_eth_start(esp_eth_handle);
-    wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-    esp_wifi_init(&wifi_init_config);
-    esp_wifi_set_mode(WIFI_MODE_STA);
-    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B);
-    esp_wifi_start();
-    esp_read_mac(gateway_config->self_mac, ESP_MAC_WIFI_STA);
-#else
-    esp_netif_create_default_wifi_sta();
-    wifi_init_config_t wifi_init_sta_config = WIFI_INIT_CONFIG_DEFAULT();
-    esp_wifi_init(&wifi_init_sta_config);
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = CONFIG_WIFI_SSID_NAME,
-            .password = CONFIG_WIFI_PASSWORD,
-        },
-    };
-    esp_wifi_set_mode(WIFI_MODE_APSTA);
-    esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
-    esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &zh_wifi_event_handler, gateway_config, NULL);
-    esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &zh_wifi_event_handler, gateway_config, NULL);
-    esp_wifi_start();
-    esp_read_mac(gateway_config->self_mac, ESP_MAC_WIFI_SOFTAP);
-#endif
+    zh_load_config(gateway_config);
+    if (gateway_config->software_config.is_lan_mode == true)
+    {
+        gpio_config_t config = {0};
+        config.intr_type = GPIO_INTR_DISABLE;
+        config.mode = GPIO_MODE_OUTPUT;
+        config.pin_bit_mask = (1ULL << ZH_LAN_MODULE_POWER_PIN);
+        config.pull_down_en = GPIO_PULLDOWN_DISABLE;
+        config.pull_up_en = GPIO_PULLUP_DISABLE;
+        gpio_config(&config);
+        gpio_set_level(ZH_LAN_MODULE_POWER_PIN, 1);
+        esp_netif_config_t esp_netif_config = ESP_NETIF_DEFAULT_ETH();
+        esp_netif_t *esp_netif_eth = esp_netif_new(&esp_netif_config);
+        eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
+        eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
+        eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
+        esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
+        esp_eth_phy_t *phy = ZH_LAN_MODULE_TYPE(&phy_config);
+        esp_eth_config_t esp_eth_config = ETH_DEFAULT_CONFIG(mac, phy);
+        esp_eth_handle_t esp_eth_handle = NULL;
+        esp_eth_driver_install(&esp_eth_config, &esp_eth_handle);
+        esp_netif_attach(esp_netif_eth, esp_eth_new_netif_glue(esp_eth_handle));
+        esp_event_handler_instance_register(ETH_EVENT, ESP_EVENT_ANY_ID, &zh_eth_event_handler, gateway_config, NULL);
+        esp_event_handler_instance_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &zh_eth_event_handler, gateway_config, NULL);
+        esp_eth_start(esp_eth_handle);
+        wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
+        esp_wifi_init(&wifi_init_config);
+        esp_wifi_set_mode(WIFI_MODE_STA);
+        esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B);
+        esp_wifi_start();
+        esp_read_mac(gateway_config->self_mac, ESP_MAC_WIFI_STA);
+    }
+    else
+    {
+        esp_netif_create_default_wifi_sta();
+        wifi_init_config_t wifi_init_sta_config = WIFI_INIT_CONFIG_DEFAULT();
+        esp_wifi_init(&wifi_init_sta_config);
+        wifi_config_t wifi_config = {0};
+        memcpy(wifi_config.sta.ssid, gateway_config->software_config.ssid_name, 6);
+        memcpy(wifi_config.sta.password, gateway_config->software_config.ssid_password, 10);
+        esp_wifi_set_mode(WIFI_MODE_APSTA);
+        esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
+        esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+        esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &zh_wifi_event_handler, gateway_config, NULL);
+        esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &zh_wifi_event_handler, gateway_config, NULL);
+        esp_wifi_start();
+        esp_read_mac(gateway_config->self_mac, ESP_MAC_WIFI_SOFTAP);
+    }
 #ifdef CONFIG_NETWORK_TYPE_DIRECT
     zh_espnow_init_config_t zh_espnow_init_config = ZH_ESPNOW_INIT_CONFIG_DEFAULT();
     zh_espnow_init_config.queue_size = 128;
-#ifdef CONFIG_CONNECTION_TYPE_WIFI
-    zh_espnow_init_config.wifi_interface = WIFI_IF_AP;
-#endif
+    if (gateway_config->software_config.is_lan_mode == false)
+    {
+        zh_espnow_init_config.wifi_interface = WIFI_IF_AP;
+    }
     zh_espnow_init(&zh_espnow_init_config);
     esp_event_handler_instance_register(ZH_EVENT, ESP_EVENT_ANY_ID, &zh_espnow_event_handler, gateway_config, NULL);
 #else
     zh_network_init_config_t zh_network_init_config = ZH_NETWORK_INIT_CONFIG_DEFAULT();
     zh_network_init_config.queue_size = 128;
-#ifdef CONFIG_CONNECTION_TYPE_WIFI
-    zh_network_init_config.wifi_interface = WIFI_IF_AP;
-#endif
+    if (gateway_config->software_config.is_lan_mode == false)
+    {
+        zh_network_init_config.wifi_interface = WIFI_IF_AP;
+    }
     zh_network_init(&zh_network_init_config);
     esp_event_handler_instance_register(ZH_EVENT, ESP_EVENT_ANY_ID, &zh_espnow_event_handler, gateway_config, NULL);
 #endif
@@ -87,7 +90,66 @@ void app_main(void)
     }
 }
 
+void zh_load_config(gateway_config_t *gateway_config)
+{
+    nvs_handle_t nvs_handle = 0;
+    nvs_open("config", NVS_READWRITE, &nvs_handle);
+    uint8_t config_is_present = 0;
+    if (nvs_get_u8(nvs_handle, "present", &config_is_present) == ESP_ERR_NVS_NOT_FOUND)
+    {
+        nvs_set_u8(nvs_handle, "present", 0xFE);
+        nvs_close(nvs_handle);
 #ifdef CONFIG_CONNECTION_TYPE_LAN
+        gateway_config->software_config.is_lan_mode = true;
+        strcpy(gateway_config->software_config.ssid_name, "ssid");
+        strcpy(gateway_config->software_config.ssid_password, "password");
+#else
+        gateway_config->software_config.is_lan_mode = false;
+        strcpy(gateway_config->software_config.ssid_name, CONFIG_WIFI_SSID_NAME);
+        strcpy(gateway_config->software_config.ssid_password, CONFIG_WIFI_PASSWORD);
+#endif
+        strcpy(gateway_config->software_config.mqtt_broker_url, CONFIG_MQTT_BROKER_URL);
+        strcpy(gateway_config->software_config.mqtt_topic_prefix, CONFIG_MQTT_TOPIC_PREFIX);
+        strcpy(gateway_config->software_config.ntp_server_url, CONFIG_NTP_SERVER_URL);
+        strcpy(gateway_config->software_config.ntp_time_zone, CONFIG_NTP_TIME_ZONE);
+        strcpy(gateway_config->software_config.firmware_upgrade_url, CONFIG_FIRMWARE_UPGRADE_URL);
+        zh_save_config(gateway_config);
+        return;
+    }
+    nvs_get_u8(nvs_handle, "lan_mode", (uint8_t *)&gateway_config->software_config.is_lan_mode);
+    size_t size = 0;
+    nvs_get_str(nvs_handle, "ssid_name", NULL, &size);
+    nvs_get_str(nvs_handle, "ssid_name", gateway_config->software_config.ssid_name, &size);
+    nvs_get_str(nvs_handle, "ssid_password", NULL, &size);
+    nvs_get_str(nvs_handle, "ssid_password", gateway_config->software_config.ssid_password, &size);
+    nvs_get_str(nvs_handle, "mqtt_url", NULL, &size);
+    nvs_get_str(nvs_handle, "mqtt_url", gateway_config->software_config.mqtt_broker_url, &size);
+    nvs_get_str(nvs_handle, "topic_prefix", NULL, &size);
+    nvs_get_str(nvs_handle, "topic_prefix", gateway_config->software_config.mqtt_topic_prefix, &size);
+    nvs_get_str(nvs_handle, "ntp_url", NULL, &size);
+    nvs_get_str(nvs_handle, "ntp_url", gateway_config->software_config.ntp_server_url, &size);
+    nvs_get_str(nvs_handle, "time_zone", NULL, &size);
+    nvs_get_str(nvs_handle, "time_zone", gateway_config->software_config.ntp_time_zone, &size);
+    nvs_get_str(nvs_handle, "upgrade_url", NULL, &size);
+    nvs_get_str(nvs_handle, "upgrade_url", gateway_config->software_config.firmware_upgrade_url, &size);
+    nvs_close(nvs_handle);
+}
+
+void zh_save_config(const gateway_config_t *gateway_config)
+{
+    nvs_handle_t nvs_handle = 0;
+    nvs_open("config", NVS_READWRITE, &nvs_handle);
+    nvs_set_u8(nvs_handle, "lan_mode", gateway_config->software_config.is_lan_mode);
+    nvs_set_str(nvs_handle, "ssid_name", gateway_config->software_config.ssid_name);
+    nvs_set_str(nvs_handle, "ssid_password", gateway_config->software_config.ssid_password);
+    nvs_set_str(nvs_handle, "mqtt_url", gateway_config->software_config.mqtt_broker_url);
+    nvs_set_str(nvs_handle, "topic_prefix", gateway_config->software_config.mqtt_topic_prefix);
+    nvs_set_str(nvs_handle, "ntp_url", gateway_config->software_config.ntp_server_url);
+    nvs_set_str(nvs_handle, "time_zone", gateway_config->software_config.ntp_time_zone);
+    nvs_set_str(nvs_handle, "upgrade_url", gateway_config->software_config.firmware_upgrade_url);
+    nvs_close(nvs_handle);
+}
+
 void zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     gateway_config_t *gateway_config = arg;
@@ -109,10 +171,9 @@ void zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_
     case IP_EVENT_ETH_GOT_IP:
         if (gateway_config->mqtt_is_enable == false)
         {
-            esp_mqtt_client_config_t mqtt_config = {
-                .broker.address.uri = CONFIG_MQTT_BROKER_URL,
-                .buffer.size = 2048,
-            };
+            esp_mqtt_client_config_t mqtt_config = {0};
+            mqtt_config.buffer.size = 2048;
+            mqtt_config.broker.address.uri = gateway_config->software_config.mqtt_broker_url;
             gateway_config->mqtt_client = esp_mqtt_client_init(&mqtt_config);
             esp_mqtt_client_register_event(gateway_config->mqtt_client, ESP_EVENT_ANY_ID, zh_mqtt_event_handler, gateway_config);
             esp_mqtt_client_start(gateway_config->mqtt_client);
@@ -122,7 +183,7 @@ void zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_
         {
             esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
             sntp_set_sync_mode(SNTP_SYNC_MODE_SMOOTH);
-            esp_sntp_setservername(0, CONFIG_NTP_SERVER_URL);
+            esp_sntp_setservername(0, gateway_config->software_config.ntp_server_url);
             esp_sntp_init();
             gateway_config->sntp_is_enable = true;
             xTaskCreatePinnedToCore(&zh_send_espnow_current_time_task, "NULL", ZH_SNTP_STACK_SIZE, gateway_config, ZH_SNTP_TASK_PRIORITY, (TaskHandle_t *)&gateway_config->gateway_current_time_task, tskNO_AFFINITY);
@@ -132,9 +193,7 @@ void zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_
         break;
     }
 }
-#endif
 
-#ifdef CONFIG_CONNECTION_TYPE_WIFI
 void zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     gateway_config_t *gateway_config = arg;
@@ -173,10 +232,9 @@ void zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event
         gateway_config->wifi_reconnect_retry_num = 0;
         if (gateway_config->mqtt_is_enable == false)
         {
-            esp_mqtt_client_config_t mqtt_config = {
-                .broker.address.uri = CONFIG_MQTT_BROKER_URL,
-                .buffer.size = 2048,
-            };
+            esp_mqtt_client_config_t mqtt_config = {0};
+            mqtt_config.buffer.size = 2048;
+            mqtt_config.broker.address.uri = gateway_config->software_config.mqtt_broker_url;
             gateway_config->mqtt_client = esp_mqtt_client_init(&mqtt_config);
             esp_mqtt_client_register_event(gateway_config->mqtt_client, ESP_EVENT_ANY_ID, zh_mqtt_event_handler, gateway_config);
             esp_mqtt_client_start(gateway_config->mqtt_client);
@@ -186,7 +244,7 @@ void zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event
         {
             esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
             sntp_set_sync_mode(SNTP_SYNC_MODE_SMOOTH);
-            esp_sntp_setservername(0, CONFIG_NTP_SERVER_URL);
+            esp_sntp_setservername(0, gateway_config->software_config.ntp_server_url);
             esp_sntp_init();
             gateway_config->sntp_is_enable = true;
             xTaskCreatePinnedToCore(&zh_send_espnow_current_time_task, "NULL", ZH_SNTP_STACK_SIZE, gateway_config, ZH_SNTP_TASK_PRIORITY, (TaskHandle_t *)&gateway_config->gateway_current_time_task, tskNO_AFFINITY);
@@ -196,7 +254,6 @@ void zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event
         break;
     }
 }
-#endif
 
 void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -219,9 +276,9 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
         }
 #endif
         zh_espnow_data_t *data = (zh_espnow_data_t *)recv_data->data;
-        char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(data->device_type)) + 20, MALLOC_CAP_8BIT);
-        memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(data->device_type)) + 20);
-        sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(data->device_type), MAC2STR(recv_data->mac_addr));
+        char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(data->device_type)) + 20, MALLOC_CAP_8BIT);
+        memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(data->device_type)) + 20);
+        sprintf(topic, "%s/%s/" MAC_STR, gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(data->device_type), MAC2STR(recv_data->mac_addr));
         switch (data->payload_type)
         {
         case ZHPT_ATTRIBUTES:
@@ -359,9 +416,9 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             for (zh_device_type_t i = 1; i <= ZHDT_MAX; ++i)
             {
                 supported_device_type = zh_get_device_type_value_name(i);
-                topic_for_subscribe = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(supported_device_type) + 4, MALLOC_CAP_8BIT);
-                memset(topic_for_subscribe, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(supported_device_type) + 4);
-                sprintf(topic_for_subscribe, "%s/%s/#", CONFIG_MQTT_TOPIC_PREFIX, supported_device_type);
+                topic_for_subscribe = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(supported_device_type) + 4, MALLOC_CAP_8BIT);
+                memset(topic_for_subscribe, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(supported_device_type) + 4);
+                sprintf(topic_for_subscribe, "%s/%s/#", gateway_config->software_config.mqtt_topic_prefix, supported_device_type);
                 esp_mqtt_client_subscribe(gateway_config->mqtt_client, topic_for_subscribe, 2);
                 heap_caps_free(topic_for_subscribe);
             }
@@ -723,17 +780,17 @@ void zh_self_ota_update_task(void *pvParameter)
 {
     gateway_config_t *gateway_config = pvParameter;
     xSemaphoreTake(gateway_config->self_ota_in_progress_mutex, portMAX_DELAY);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(ZHDT_GATEWAY)) + 20, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(ZHDT_GATEWAY)) + 20);
-    sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(ZHDT_GATEWAY), MAC2STR(gateway_config->self_mac));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(ZHDT_GATEWAY)) + 20, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(ZHDT_GATEWAY)) + 20);
+    sprintf(topic, "%s/%s/" MAC_STR, gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(ZHDT_GATEWAY), MAC2STR(gateway_config->self_mac));
     char self_ota_write_data[1025] = {0};
     esp_ota_handle_t update_handle = {0};
     const esp_partition_t *update_partition = NULL;
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_begin", 0, 2, true);
     const esp_app_desc_t *app_info = esp_app_get_description();
-    char *app_name = (char *)heap_caps_malloc(strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(app_info->project_name) + 6, MALLOC_CAP_8BIT);
-    memset(app_name, 0, strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(app_info->project_name) + 6);
-    sprintf(app_name, "%s/%s.bin", CONFIG_FIRMWARE_UPGRADE_URL, app_info->project_name);
+    char *app_name = (char *)heap_caps_malloc(strlen(gateway_config->software_config.firmware_upgrade_url) + strlen(app_info->project_name) + 6, MALLOC_CAP_8BIT);
+    memset(app_name, 0, strlen(gateway_config->software_config.firmware_upgrade_url) + strlen(app_info->project_name) + 6);
+    sprintf(app_name, "%s/%s.bin", gateway_config->software_config.firmware_upgrade_url, app_info->project_name);
     esp_http_client_config_t config = {
         .url = app_name,
         .cert_pem = (char *)server_certificate_pem_start,
@@ -793,14 +850,14 @@ void zh_espnow_ota_update_task(void *pvParameter)
     xSemaphoreTake(gateway_config->espnow_ota_in_progress_mutex, portMAX_DELAY);
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type)) + 20, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type)) + 20);
-    sprintf(topic, "%s/%s/" MAC_STR, CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), MAC2STR(gateway_config->espnow_ota_data.mac_addr));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type)) + 20, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type)) + 20);
+    sprintf(topic, "%s/%s/" MAC_STR, gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), MAC2STR(gateway_config->espnow_ota_data.mac_addr));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_begin", 0, 2, true);
     char espnow_ota_write_data[sizeof(data.payload_data.ota_message.espnow_ota_message.data) + 1] = {0};
-    char *app_name = (char *)heap_caps_malloc(strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(gateway_config->espnow_ota_data.app_name) + 6, MALLOC_CAP_8BIT);
-    memset(app_name, 0, strlen(CONFIG_FIRMWARE_UPGRADE_URL) + strlen(gateway_config->espnow_ota_data.app_name) + 6);
-    sprintf(app_name, "%s/%s.bin", CONFIG_FIRMWARE_UPGRADE_URL, gateway_config->espnow_ota_data.app_name);
+    char *app_name = (char *)heap_caps_malloc(strlen(gateway_config->software_config.firmware_upgrade_url) + strlen(gateway_config->espnow_ota_data.app_name) + 6, MALLOC_CAP_8BIT);
+    memset(app_name, 0, strlen(gateway_config->software_config.firmware_upgrade_url) + strlen(gateway_config->espnow_ota_data.app_name) + 6);
+    sprintf(app_name, "%s/%s.bin", gateway_config->software_config.firmware_upgrade_url, gateway_config->espnow_ota_data.app_name);
     esp_http_client_config_t config = {
         .url = app_name,
         .cert_pem = (char *)server_certificate_pem_start,
@@ -873,13 +930,13 @@ void zh_espnow_ota_update_task(void *pvParameter)
 
 void zh_send_espnow_current_time_task(void *pvParameter)
 {
-    // gateway_config_t *gateway_config = pvParameter;
+    gateway_config_t *gateway_config = pvParameter;
     while (sntp_get_sync_status() != SNTP_SYNC_STATUS_COMPLETED)
     {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
     time_t now;
-    setenv("TZ", CONFIG_NTP_TIME_ZONE, 1);
+    setenv("TZ", gateway_config->software_config.ntp_time_zone, 1);
     tzset();
     for (;;)
     {
@@ -906,9 +963,9 @@ void zh_device_availability_check_task(void *pvParameter)
             }
             if (esp_timer_get_time() / 1000000 > available_device->time + (available_device->frequency * 3))
             {
-                char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(available_device->device_type)) + 27, MALLOC_CAP_8BIT);
-                memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(available_device->device_type)) + 27);
-                sprintf(topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(available_device->device_type), MAC2STR(available_device->mac_addr));
+                char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(available_device->device_type)) + 27, MALLOC_CAP_8BIT);
+                memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(available_device->device_type)) + 27);
+                sprintf(topic, "%s/%s/" MAC_STR "/status", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(available_device->device_type), MAC2STR(available_device->mac_addr));
                 esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "offline", 0, 2, true);
                 heap_caps_free(topic);
                 zh_vector_delete_item(&gateway_config->available_device_vector, i);
@@ -1045,9 +1102,9 @@ void zh_espnow_send_mqtt_json_attributes_message(zh_espnow_data_t *device_data, 
     zh_json_add(&json, "Uptime", uptime);
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(topic, "%s/%s/" MAC_STR "/attributes", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(mac);
     heap_caps_free(uptime);
@@ -1061,9 +1118,9 @@ void zh_espnow_send_mqtt_json_attributes_message(zh_espnow_data_t *device_data, 
 void zh_espnow_send_mqtt_json_keep_alive_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config)
 {
     char *status = (device_data->payload_data.keep_alive_message.online_status == ZH_ONLINE) ? "online" : "offline";
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
-    sprintf(topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
+    sprintf(topic, "%s/%s/" MAC_STR "/status", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, status, 0, 2, true);
     heap_caps_free(topic);
 }
@@ -1076,18 +1133,18 @@ void zh_espnow_switch_send_mqtt_json_config_message(const zh_espnow_data_t *devi
     char *unique_id = (char *)heap_caps_malloc(22, MALLOC_CAP_8BIT);
     memset(unique_id, 0, 22);
     sprintf(unique_id, "" MAC_STR "-%d", MAC2STR(device_mac), device_data->payload_data.config_message.switch_config_message.unique_id);
-    char *state_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
-    memset(state_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *availability_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
-    memset(availability_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
-    sprintf(availability_topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *command_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24, MALLOC_CAP_8BIT);
-    memset(command_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24);
-    sprintf(command_topic, "%s/%s/" MAC_STR "/set", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *json_attributes_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
-    memset(json_attributes_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *state_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
+    memset(state_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(state_topic, "%s/%s/" MAC_STR "/state", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *availability_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
+    memset(availability_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
+    sprintf(availability_topic, "%s/%s/" MAC_STR "/status", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *command_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24, MALLOC_CAP_8BIT);
+    memset(command_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24);
+    sprintf(command_topic, "%s/%s/" MAC_STR "/set", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *json_attributes_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
+    memset(json_attributes_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *qos = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
     memset(qos, 0, 4);
     sprintf(qos, "%d", device_data->payload_data.config_message.switch_config_message.qos);
@@ -1111,9 +1168,9 @@ void zh_espnow_switch_send_mqtt_json_config_message(const zh_espnow_data_t *devi
     zh_json_add(&json, "retain", (device_data->payload_data.config_message.switch_config_message.retain == true) ? "true" : "false");
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(unique_id) + 16, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(unique_id) + 16);
-    sprintf(topic, "%s/switch/%s/config", CONFIG_MQTT_TOPIC_PREFIX, unique_id);
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(unique_id) + 16, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(unique_id) + 16);
+    sprintf(topic, "%s/switch/%s/config", gateway_config->software_config.mqtt_topic_prefix, unique_id);
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(name);
     heap_caps_free(unique_id);
@@ -1198,9 +1255,9 @@ void zh_espnow_switch_send_mqtt_json_hardware_config_message(const zh_espnow_dat
     }
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
-    sprintf(topic, "%s/%s/" MAC_STR "/config", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
+    sprintf(topic, "%s/%s/" MAC_STR "/config", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(relay_pin);
     heap_caps_free(led_pin);
@@ -1218,9 +1275,9 @@ void zh_espnow_switch_send_mqtt_json_status_message(const zh_espnow_data_t *devi
     zh_json_add(&json, "state", zh_get_on_off_type_value_name(device_data->payload_data.status_message.switch_status_message.status));
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(topic, "%s/%s/" MAC_STR "/state", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(topic);
 }
@@ -1233,30 +1290,30 @@ void zh_espnow_led_send_mqtt_json_config_message(const zh_espnow_data_t *device_
     char *unique_id = (char *)heap_caps_malloc(22, MALLOC_CAP_8BIT);
     memset(unique_id, 0, 22);
     sprintf(unique_id, "" MAC_STR "-%d", MAC2STR(device_mac), device_data->payload_data.config_message.led_config_message.unique_id);
-    char *state_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
-    memset(state_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *availability_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
-    memset(availability_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
-    sprintf(availability_topic, "%s/%s/" MAC_STR "/status", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *command_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24, MALLOC_CAP_8BIT);
-    memset(command_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24);
-    sprintf(command_topic, "%s/%s/" MAC_STR "/set", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *json_attributes_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
-    memset(json_attributes_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *state_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
+    memset(state_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(state_topic, "%s/%s/" MAC_STR "/state", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *availability_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
+    memset(availability_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
+    sprintf(availability_topic, "%s/%s/" MAC_STR "/status", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *command_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24, MALLOC_CAP_8BIT);
+    memset(command_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24);
+    sprintf(command_topic, "%s/%s/" MAC_STR "/set", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *json_attributes_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
+    memset(json_attributes_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *qos = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
     memset(qos, 0, 4);
     sprintf(qos, "%d", device_data->payload_data.config_message.led_config_message.qos);
-    char *brightness_command_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
-    memset(brightness_command_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(brightness_command_topic, "%s/%s/" MAC_STR "/brightness", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *color_temp_command_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 32, MALLOC_CAP_8BIT);
-    memset(color_temp_command_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 32);
-    sprintf(color_temp_command_topic, "%s/%s/" MAC_STR "/temperature", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
-    char *rgb_command_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24, MALLOC_CAP_8BIT);
-    memset(rgb_command_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24);
-    sprintf(rgb_command_topic, "%s/%s/" MAC_STR "/rgb", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *brightness_command_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
+    memset(brightness_command_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(brightness_command_topic, "%s/%s/" MAC_STR "/brightness", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *color_temp_command_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 32, MALLOC_CAP_8BIT);
+    memset(color_temp_command_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 32);
+    sprintf(color_temp_command_topic, "%s/%s/" MAC_STR "/temperature", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *rgb_command_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24, MALLOC_CAP_8BIT);
+    memset(rgb_command_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 24);
+    sprintf(rgb_command_topic, "%s/%s/" MAC_STR "/rgb", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     zh_json_t json = {0};
     char buffer[1024] = {0};
     zh_json_init(&json);
@@ -1291,9 +1348,9 @@ void zh_espnow_led_send_mqtt_json_config_message(const zh_espnow_data_t *device_
     }
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(unique_id) + 15, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(unique_id) + 15);
-    sprintf(topic, "%s/light/%s/config", CONFIG_MQTT_TOPIC_PREFIX, unique_id);
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(unique_id) + 15, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(unique_id) + 15);
+    sprintf(topic, "%s/light/%s/config", gateway_config->software_config.mqtt_topic_prefix, unique_id);
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(name);
     heap_caps_free(unique_id);
@@ -1328,9 +1385,9 @@ void zh_espnow_led_send_mqtt_json_status_message(const zh_espnow_data_t *device_
     zh_json_add(&json, "rgb", rgb);
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(topic, "%s/%s/" MAC_STR "/state", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(topic);
 }
@@ -1343,15 +1400,15 @@ void zh_espnow_sensor_send_mqtt_json_config_message(zh_espnow_data_t *device_dat
     char *unique_id = (char *)heap_caps_malloc(22, MALLOC_CAP_8BIT);
     memset(unique_id, 0, 22);
     sprintf(unique_id, "" MAC_STR "-%d", MAC2STR(device_mac), device_data->payload_data.config_message.sensor_config_message.unique_id);
-    char *state_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
-    memset(state_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *state_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
+    memset(state_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(state_topic, "%s/%s/" MAC_STR "/state", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *value_template = (char *)heap_caps_malloc(strlen(zh_get_sensor_device_class_value_name(device_data->payload_data.config_message.sensor_config_message.sensor_device_class)) + 18, MALLOC_CAP_8BIT);
     memset(value_template, 0, strlen(zh_get_sensor_device_class_value_name(device_data->payload_data.config_message.sensor_config_message.sensor_device_class)) + 18);
     sprintf(value_template, "{{ value_json.%s }}", zh_get_sensor_device_class_value_name(device_data->payload_data.config_message.sensor_config_message.sensor_device_class));
-    char *json_attributes_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
-    memset(json_attributes_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *json_attributes_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
+    memset(json_attributes_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *qos = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
     memset(qos, 0, 4);
     sprintf(qos, "%d", device_data->payload_data.config_message.sensor_config_message.qos);
@@ -1380,9 +1437,9 @@ void zh_espnow_sensor_send_mqtt_json_config_message(zh_espnow_data_t *device_dat
     zh_json_add(&json, "unit_of_measurement", device_data->payload_data.config_message.sensor_config_message.unit_of_measurement);
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(unique_id) + 16, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(unique_id) + 16);
-    sprintf(topic, "%s/sensor/%s/config", CONFIG_MQTT_TOPIC_PREFIX, unique_id);
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(unique_id) + 16, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(unique_id) + 16);
+    sprintf(topic, "%s/sensor/%s/config", gateway_config->software_config.mqtt_topic_prefix, unique_id);
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(name);
     heap_caps_free(unique_id);
@@ -1455,9 +1512,9 @@ void zh_espnow_sensor_send_mqtt_json_hardware_config_message(const zh_espnow_dat
     zh_json_add(&json, "Power mode", (device_data->payload_data.config_message.sensor_hardware_config_message.battery_power == true) ? "Battery" : "External");
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
-    sprintf(topic, "%s/%s/" MAC_STR "/config", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
+    sprintf(topic, "%s/%s/" MAC_STR "/config", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(sensor_pin_1);
     heap_caps_free(sensor_pin_2);
@@ -1498,9 +1555,9 @@ void zh_espnow_sensor_send_mqtt_json_status_message(const zh_espnow_data_t *devi
     }
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(topic, "%s/%s/" MAC_STR "/state", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(temperature);
     heap_caps_free(humidity);
@@ -1515,15 +1572,15 @@ void zh_espnow_binary_sensor_send_mqtt_json_config_message(const zh_espnow_data_
     char *unique_id = (char *)heap_caps_malloc(22, MALLOC_CAP_8BIT);
     memset(unique_id, 0, 22);
     sprintf(unique_id, "" MAC_STR "-%d", MAC2STR(device_mac), device_data->payload_data.config_message.binary_sensor_config_message.unique_id);
-    char *state_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
-    memset(state_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
-    sprintf(state_topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *state_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26, MALLOC_CAP_8BIT);
+    memset(state_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 26);
+    sprintf(state_topic, "%s/%s/" MAC_STR "/state", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *value_template = (char *)heap_caps_malloc(strlen(zh_get_binary_sensor_device_class_value_name(device_data->payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class)) + 18, MALLOC_CAP_8BIT);
     memset(value_template, 0, strlen(zh_get_binary_sensor_device_class_value_name(device_data->payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class)) + 18);
     sprintf(value_template, "{{ value_json.%s }}", zh_get_binary_sensor_device_class_value_name(device_data->payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class));
-    char *json_attributes_topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
-    memset(json_attributes_topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *json_attributes_topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
+    memset(json_attributes_topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(json_attributes_topic, "%s/%s/" MAC_STR "/attributes", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     char *qos = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
     memset(qos, 0, 4);
     sprintf(qos, "%d", device_data->payload_data.config_message.binary_sensor_config_message.qos);
@@ -1559,9 +1616,9 @@ void zh_espnow_binary_sensor_send_mqtt_json_config_message(const zh_espnow_data_
     }
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(unique_id) + 23, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(unique_id) + 23);
-    sprintf(topic, "%s/binary_sensor/%s/config", CONFIG_MQTT_TOPIC_PREFIX, unique_id);
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(unique_id) + 23, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(unique_id) + 23);
+    sprintf(topic, "%s/binary_sensor/%s/config", gateway_config->software_config.mqtt_topic_prefix, unique_id);
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(name);
     heap_caps_free(unique_id);
@@ -1601,9 +1658,9 @@ void zh_espnow_binary_sensor_send_mqtt_json_status_message(const zh_espnow_data_
     }
     zh_json_create(&json, buffer);
     zh_json_free(&json);
-    char *topic = (char *)heap_caps_malloc(strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
-    memset(topic, 0, strlen(CONFIG_MQTT_TOPIC_PREFIX) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
-    sprintf(topic, "%s/%s/" MAC_STR "/state", CONFIG_MQTT_TOPIC_PREFIX, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
+    sprintf(topic, "%s/%s/" MAC_STR "/state", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
     heap_caps_free(topic);
 }
