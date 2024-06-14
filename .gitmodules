@@ -1,0 +1,15 @@
+[submodule "components/zh_json"]
+	path = components/zh_json
+	url = https://github.com/aZholtikov/zh_json
+[submodule "components/zh_network"]
+	path = components/zh_network
+	url = https://github.com/aZholtikov/zh_network
+[submodule "components/zh_vector"]
+	path = components/zh_vector
+	url = https://github.com/aZholtikov/zh_vector
+[submodule "components/zh_config"]
+	path = components/zh_config
+	url = https://github.com/aZholtikov/zh_config
+[submodule "components/zh_espnow"]
+	path = components/zh_espnow
+	url = https://github.com/aZholtikov/zh_espnow

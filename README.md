@@ -29,7 +29,7 @@ Run the following command to firmware build and flash module:
 
 ```text
 cd your_projects_folder
-git clone https://github.com/aZholtikov/zh_gateway.git
+git clone --recurse-submodules https://github.com/aZholtikov/zh_gateway.git
 cd zh_gateway
 idf.py menuconfig
 idf.py build
