@@ -212,6 +212,15 @@ bool zh_bool_value_check(const int value);
 uint8_t zh_sensor_type_check(const int type);
 
 /**
+ * @brief Function for checking the correctness of the led type value.
+ *
+ * @param type Value for check.
+ *
+ * @return Led type value or 0 if error
+ */
+uint8_t zh_led_type_check(const int type);
+
+/**
  * @brief Function for checking the correctness of the uint16_t variable value.
  *
  * @param value Value for check.
@@ -296,6 +305,15 @@ void zh_espnow_switch_send_mqtt_json_status_message(const zh_espnow_data_t *devi
 void zh_espnow_led_send_mqtt_json_config_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config);
 
 /**
+ * @brief Function for converting to JSON and sending to the MQTT broker the hardware configuration message received from a zh_espnow_led node.
+ *
+ * @param[in] device_data Pointer to structure for data exchange between ESP-NOW devices.
+ * @param[in] device_mac Pointer to ESP-NOW node MAC address.
+ * @param[in] gateway_config Pointer to the structure of data exchange between tasks, functions and event handlers.
+ */
+void zh_espnow_led_send_mqtt_json_hardware_config_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config);
+
+/**
  * @brief Function for converting to JSON and sending to the MQTT broker the status message received from a zh_espnow_led node.
  *
  * @param[in] device_data Pointer to structure for data exchange between ESP-NOW devices.
@@ -339,6 +357,15 @@ void zh_espnow_sensor_send_mqtt_json_status_message(const zh_espnow_data_t *devi
  * @param[in] gateway_config Pointer to the structure of data exchange between tasks, functions and event handlers.
  */
 void zh_espnow_binary_sensor_send_mqtt_json_config_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config);
+
+/**
+ * @brief Function for converting to JSON and sending to the MQTT broker the hardware configuration message received from a zh_espnow_binary_sensor node.
+ *
+ * @param[in] device_data Pointer to structure for data exchange between ESP-NOW devices.
+ * @param[in] device_mac Pointer to ESP-NOW node MAC address.
+ * @param[in] gateway_config Pointer to the structure of data exchange between tasks, functions and event handlers.
+ */
+void zh_espnow_binary_sensor_send_mqtt_json_hardware_config_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config);
 
 /**
  * @brief Function for converting to JSON and sending to the MQTT broker the status message received from a zh_espnow_binary_sensor node.

@@ -46,8 +46,8 @@ void app_main(void)
         wifi_init_config_t wifi_init_sta_config = WIFI_INIT_CONFIG_DEFAULT();
         esp_wifi_init(&wifi_init_sta_config);
         wifi_config_t wifi_config = {0};
-        memcpy(wifi_config.sta.ssid, gateway_config->software_config.ssid_name, 6);
-        memcpy(wifi_config.sta.password, gateway_config->software_config.ssid_password, 10);
+        memcpy(wifi_config.sta.ssid, gateway_config->software_config.ssid_name, strlen(gateway_config->software_config.ssid_name));
+        memcpy(wifi_config.sta.password, gateway_config->software_config.ssid_password, strlen(gateway_config->software_config.ssid_password));
         esp_wifi_set_mode(WIFI_MODE_APSTA);
         esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
         esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
@@ -331,11 +331,13 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
                 zh_espnow_switch_send_mqtt_json_hardware_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_LED:
+                zh_espnow_led_send_mqtt_json_hardware_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_SENSOR:
                 zh_espnow_sensor_send_mqtt_json_hardware_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             case ZHDT_BINARY_SENSOR:
+                zh_espnow_binary_sensor_send_mqtt_json_hardware_config_message(data, recv_data->mac_addr, gateway_config);
                 break;
             default:
                 break;
@@ -508,6 +510,12 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                     }
                     else if (strncmp(incoming_payload, "restart", strlen(incoming_payload) + 1) == 0)
                     {
+                        zh_espnow_data_t data = {0};
+                        data.device_type = ZHDT_GATEWAY;
+                        data.payload_type = ZHPT_KEEP_ALIVE;
+                        data.payload_data.keep_alive_message.online_status = ZH_OFFLINE;
+                        zh_send_message(NULL, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+                        vTaskDelay(1000 / portTICK_PERIOD_MS);
                         esp_restart();
                     }
                     else
@@ -679,6 +687,46 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 data.payload_type = ZHPT_RGB;
                 zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 break;
+            case ZHPT_HARDWARE:
+                char *extracted_hardware_data = strtok(incoming_payload, ","); // Extract led type value.
+                if (extracted_hardware_data == NULL)
+                {
+                    break;
+                }
+                data.payload_data.config_message.led_hardware_config_message.led_type = zh_led_type_check(atoi(extracted_hardware_data));
+                extracted_hardware_data = strtok(NULL, ","); // Extract first white gpio number value.
+                if (extracted_hardware_data == NULL)
+                {
+                    break;
+                }
+                data.payload_data.config_message.led_hardware_config_message.first_white_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                extracted_hardware_data = strtok(NULL, ","); // Extract second white gpio number value.
+                if (extracted_hardware_data == NULL)
+                {
+                    break;
+                }
+                data.payload_data.config_message.led_hardware_config_message.second_white_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                extracted_hardware_data = strtok(NULL, ","); // Extract red gpio number value.
+                if (extracted_hardware_data == NULL)
+                {
+                    break;
+                }
+                data.payload_data.config_message.led_hardware_config_message.red_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                extracted_hardware_data = strtok(NULL, ","); // Extract green gpio number value.
+                if (extracted_hardware_data == NULL)
+                {
+                    break;
+                }
+                data.payload_data.config_message.led_hardware_config_message.green_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                extracted_hardware_data = strtok(NULL, ","); // Extract blue gpio number value.
+                if (extracted_hardware_data == NULL)
+                {
+                    break;
+                }
+                data.payload_data.config_message.led_hardware_config_message.blue_pin = zh_gpio_number_check(atoi(extracted_hardware_data));
+                data.payload_type = ZHPT_HARDWARE;
+                zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
+                break;
             default:
                 break;
             }
@@ -840,6 +888,11 @@ void zh_self_ota_update_task(void *pvParameter)
     esp_http_client_cleanup(https_client);
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_success", 0, 2, true);
     heap_caps_free(topic);
+    zh_espnow_data_t data = {0};
+    data.device_type = ZHDT_GATEWAY;
+    data.payload_type = ZHPT_KEEP_ALIVE;
+    data.payload_data.keep_alive_message.online_status = ZH_OFFLINE;
+    zh_send_message(NULL, (uint8_t *)&data, sizeof(zh_espnow_data_t));
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     esp_restart();
 }
@@ -991,6 +1044,11 @@ bool zh_bool_value_check(int value)
 uint8_t zh_sensor_type_check(int type)
 {
     return (type > HAST_NONE && type < HAST_MAX) ? type : HAST_NONE;
+}
+
+uint8_t zh_led_type_check(int type)
+{
+    return (type > HALT_NONE && type < HALT_MAX) ? type : HALT_NONE;
 }
 
 uint16_t zh_uint16_value_check(int value)
@@ -1365,6 +1423,108 @@ void zh_espnow_led_send_mqtt_json_config_message(const zh_espnow_data_t *device_
     heap_caps_free(topic);
 }
 
+void zh_espnow_led_send_mqtt_json_hardware_config_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config)
+{
+    char *first_white_pin = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
+    memset(first_white_pin, 0, 4);
+    char *second_white_pin = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
+    memset(second_white_pin, 0, 4);
+    char *red_pin = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
+    memset(red_pin, 0, 4);
+    char *green_pin = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
+    memset(green_pin, 0, 4);
+    char *blue_pin = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
+    memset(blue_pin, 0, 4);
+    zh_json_t json = {0};
+    char buffer[512] = {0};
+    zh_json_init(&json);
+    if (device_data->payload_data.config_message.led_hardware_config_message.first_white_pin == ZH_NOT_USED && device_data->payload_data.config_message.led_hardware_config_message.red_pin == ZH_NOT_USED)
+    {
+        zh_json_add(&json, "Led type", "Not used");
+    }
+    else
+    {
+        switch (device_data->payload_data.config_message.led_hardware_config_message.led_type)
+        {
+        case HALT_W:
+            zh_json_add(&json, "Led type", "W");
+            break;
+        case HALT_WW:
+            zh_json_add(&json, "Led type", "WW");
+            break;
+        case HALT_RGB:
+            zh_json_add(&json, "Led type", "RGB");
+            break;
+        case HALT_RGBW:
+            zh_json_add(&json, "Led type", "RGBW");
+            break;
+        case HALT_RGBWW:
+            zh_json_add(&json, "Led type", "RGBWW");
+            break;
+        default:
+            zh_json_add(&json, "Led type", "Not used");
+            break;
+        }
+    }
+    if (device_data->payload_data.config_message.led_hardware_config_message.first_white_pin == ZH_NOT_USED)
+    {
+        zh_json_add(&json, "First white GPIO number", "Not used");
+    }
+    else
+    {
+        sprintf(first_white_pin, "%d", device_data->payload_data.config_message.led_hardware_config_message.first_white_pin);
+        zh_json_add(&json, "First white GPIO number", first_white_pin);
+    }
+    if (device_data->payload_data.config_message.led_hardware_config_message.second_white_pin == ZH_NOT_USED)
+    {
+        zh_json_add(&json, "Second white GPIO number", "Not used");
+    }
+    else
+    {
+        sprintf(second_white_pin, "%d", device_data->payload_data.config_message.led_hardware_config_message.second_white_pin);
+        zh_json_add(&json, "Second white GPIO number", second_white_pin);
+    }
+    if (device_data->payload_data.config_message.led_hardware_config_message.red_pin == ZH_NOT_USED)
+    {
+        zh_json_add(&json, "Red GPIO number", "Not used");
+    }
+    else
+    {
+        sprintf(red_pin, "%d", device_data->payload_data.config_message.led_hardware_config_message.red_pin);
+        zh_json_add(&json, "Red GPIO number", red_pin);
+    }
+    if (device_data->payload_data.config_message.led_hardware_config_message.green_pin == ZH_NOT_USED)
+    {
+        zh_json_add(&json, "Green GPIO number", "Not used");
+    }
+    else
+    {
+        sprintf(green_pin, "%d", device_data->payload_data.config_message.led_hardware_config_message.green_pin);
+        zh_json_add(&json, "Green GPIO number", green_pin);
+    }
+    if (device_data->payload_data.config_message.led_hardware_config_message.blue_pin == ZH_NOT_USED)
+    {
+        zh_json_add(&json, "Blue GPIO number", "Not used");
+    }
+    else
+    {
+        sprintf(blue_pin, "%d", device_data->payload_data.config_message.led_hardware_config_message.blue_pin);
+        zh_json_add(&json, "Blue GPIO number", blue_pin);
+    }
+    zh_json_create(&json, buffer);
+    zh_json_free(&json);
+    char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27, MALLOC_CAP_8BIT);
+    memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 27);
+    sprintf(topic, "%s/%s/" MAC_STR "/config", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
+    esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
+    heap_caps_free(first_white_pin);
+    heap_caps_free(second_white_pin);
+    heap_caps_free(red_pin);
+    heap_caps_free(green_pin);
+    heap_caps_free(blue_pin);
+    heap_caps_free(topic);
+}
+
 void zh_espnow_led_send_mqtt_json_status_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config)
 {
     char *brightness = (char *)heap_caps_malloc(4, MALLOC_CAP_8BIT);
@@ -1468,17 +1628,11 @@ void zh_espnow_sensor_send_mqtt_json_hardware_config_message(const zh_espnow_dat
     if (device_data->payload_data.config_message.sensor_hardware_config_message.sensor_pin_1 == ZH_NOT_USED)
     {
         zh_json_add(&json, "Sensor type", "Not used");
-    }
-    else
-    {
-        zh_json_add(&json, "Sensor type", zh_get_sensor_type_value_name(device_data->payload_data.config_message.sensor_hardware_config_message.sensor_type));
-    }
-    if (device_data->payload_data.config_message.sensor_hardware_config_message.sensor_pin_1 == ZH_NOT_USED)
-    {
         zh_json_add(&json, "Sensor GPIO number 1", "Not used");
     }
     else
     {
+        zh_json_add(&json, "Sensor type", zh_get_sensor_type_value_name(device_data->payload_data.config_message.sensor_hardware_config_message.sensor_type));
         sprintf(sensor_pin_1, "%d", device_data->payload_data.config_message.sensor_hardware_config_message.sensor_pin_1);
         zh_json_add(&json, "Sensor GPIO number 1", sensor_pin_1);
     }
@@ -1525,30 +1679,64 @@ void zh_espnow_sensor_send_mqtt_json_hardware_config_message(const zh_espnow_dat
 
 void zh_espnow_sensor_send_mqtt_json_status_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config)
 {
+    char *voltage = (char *)heap_caps_malloc(317, MALLOC_CAP_8BIT);
+    memset(voltage, 0, 317);
     char *temperature = (char *)heap_caps_malloc(317, MALLOC_CAP_8BIT);
     memset(temperature, 0, 317);
     char *humidity = (char *)heap_caps_malloc(317, MALLOC_CAP_8BIT);
     memset(humidity, 0, 317);
+    char *atmospheric_pressure = (char *)heap_caps_malloc(317, MALLOC_CAP_8BIT);
+    memset(atmospheric_pressure, 0, 317);
+    char *aqi = (char *)heap_caps_malloc(317, MALLOC_CAP_8BIT);
+    memset(aqi, 0, 317);
+    char *illuminance = (char *)heap_caps_malloc(317, MALLOC_CAP_8BIT);
+    memset(illuminance, 0, 317);
     zh_json_t json = {0};
     char buffer[512] = {0};
     zh_json_init(&json);
+    sprintf(voltage, "%f", device_data->payload_data.status_message.sensor_status_message.voltage);
+    zh_json_add(&json, "voltage", voltage);
     switch (device_data->payload_data.status_message.sensor_status_message.sensor_type)
     {
     case HAST_DS18B20:
         sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
         zh_json_add(&json, "temperature", temperature);
         break;
-    case HAST_DHT11:
+    case HAST_DHT11: // Deprecated. Will be removed soon.
+    case HAST_DHT22: // Deprecated. Will be removed soon.
+    case HAST_DHT:
         sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
-        sprintf(humidity, "%f", device_data->payload_data.status_message.sensor_status_message.humidity);
         zh_json_add(&json, "temperature", temperature);
+        sprintf(humidity, "%f", device_data->payload_data.status_message.sensor_status_message.humidity);
         zh_json_add(&json, "humidity", humidity);
         break;
-    case HAST_DHT22:
+    case HAST_BH1750:
+        sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.illuminance);
+        zh_json_add(&json, "illuminance", illuminance);
+        break;
+    case HAST_BMP280:
         sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
-        sprintf(humidity, "%f", device_data->payload_data.status_message.sensor_status_message.humidity);
         zh_json_add(&json, "temperature", temperature);
+        sprintf(atmospheric_pressure, "%f", device_data->payload_data.status_message.sensor_status_message.atmospheric_pressure);
+        zh_json_add(&json, "atmospheric_pressure", atmospheric_pressure);
+        break;
+    case HAST_BME280:
+        sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
+        zh_json_add(&json, "temperature", temperature);
+        sprintf(humidity, "%f", device_data->payload_data.status_message.sensor_status_message.humidity);
         zh_json_add(&json, "humidity", humidity);
+        sprintf(atmospheric_pressure, "%f", device_data->payload_data.status_message.sensor_status_message.atmospheric_pressure);
+        zh_json_add(&json, "atmospheric_pressure", atmospheric_pressure);
+        break;
+    case HAST_BME680:
+        sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
+        zh_json_add(&json, "temperature", temperature);
+        sprintf(humidity, "%f", device_data->payload_data.status_message.sensor_status_message.humidity);
+        zh_json_add(&json, "humidity", humidity);
+        sprintf(atmospheric_pressure, "%f", device_data->payload_data.status_message.sensor_status_message.atmospheric_pressure);
+        zh_json_add(&json, "atmospheric_pressure", atmospheric_pressure);
+        sprintf(aqi, "%f", device_data->payload_data.status_message.sensor_status_message.aqi);
+        zh_json_add(&json, "aqi", aqi);
         break;
     default:
         break;
@@ -1559,8 +1747,12 @@ void zh_espnow_sensor_send_mqtt_json_status_message(const zh_espnow_data_t *devi
     memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(device_data->device_type)) + 31);
     sprintf(topic, "%s/%s/" MAC_STR "/state", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(device_data->device_type), MAC2STR(device_mac));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, buffer, 0, 2, true);
+    heap_caps_free(voltage);
     heap_caps_free(temperature);
     heap_caps_free(humidity);
+    heap_caps_free(atmospheric_pressure);
+    heap_caps_free(aqi);
+    heap_caps_free(illuminance);
     heap_caps_free(topic);
 }
 
@@ -1629,6 +1821,10 @@ void zh_espnow_binary_sensor_send_mqtt_json_config_message(const zh_espnow_data_
     heap_caps_free(expire_after);
     heap_caps_free(off_delay);
     heap_caps_free(topic);
+}
+
+void zh_espnow_binary_sensor_send_mqtt_json_hardware_config_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config)
+{
 }
 
 void zh_espnow_binary_sensor_send_mqtt_json_status_message(const zh_espnow_data_t *device_data, const uint8_t *device_mac, const gateway_config_t *gateway_config)
