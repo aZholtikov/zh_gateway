@@ -141,7 +141,7 @@ void zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 void zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 
 /**
- * @brief Function for ESP-NOW event processing
+ * @brief Function for ESP-NOW event processing.
  *
  * @param[in,out] arg Pointer to the structure of data exchange between tasks, functions and event handlers.
  */

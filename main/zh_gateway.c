@@ -955,7 +955,7 @@ void zh_espnow_ota_update_task(void *pvParameter)
             memcpy(data.payload_data.ota_message.espnow_ota_message.data, espnow_ota_write_data, data_read_size);
             data.payload_type = ZHPT_UPDATE_PROGRESS;
             zh_send_message(gateway_config->espnow_ota_data.mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
-            if (xSemaphoreTake(gateway_config->espnow_ota_data_semaphore, 10000 / portTICK_PERIOD_MS) != pdTRUE)
+            if (xSemaphoreTake(gateway_config->espnow_ota_data_semaphore, 15000 / portTICK_PERIOD_MS) != pdTRUE)
             {
                 esp_http_client_close(https_client);
                 esp_http_client_cleanup(https_client);
@@ -1702,16 +1702,18 @@ void zh_espnow_sensor_send_mqtt_json_status_message(const zh_espnow_data_t *devi
         sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
         zh_json_add(&json, "temperature", temperature);
         break;
-    case HAST_DHT11: // Deprecated. Will be removed soon.
-    case HAST_DHT22: // Deprecated. Will be removed soon.
     case HAST_DHT:
+    case HAST_AHT:
+    case HAST_SHT:
+    case HAST_HTU21D:
+    case HAST_HDC1080:
         sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
         zh_json_add(&json, "temperature", temperature);
         sprintf(humidity, "%f", device_data->payload_data.status_message.sensor_status_message.humidity);
         zh_json_add(&json, "humidity", humidity);
         break;
     case HAST_BH1750:
-        sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.illuminance);
+        sprintf(illuminance, "%f", device_data->payload_data.status_message.sensor_status_message.illuminance);
         zh_json_add(&json, "illuminance", illuminance);
         break;
     case HAST_BMP280:
