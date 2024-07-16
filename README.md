@@ -8,20 +8,22 @@ Gateway for ESP32 ESP-IDF for data exchange between ESP-NOW devices and MQTT bro
 
 ## Features
 
-1. Automatically adds gateway configuration to Home Assistan via MQTT discovery as a binary_sensor.
-2. Automatically adds supported devices configurations to Home Assistan via MQTT discovery.
-3. Update firmware from HTTPS server via OTA.
-4. Update firmware of supported devices from HTTPS server via ESP-NOW.
-5. LAN or WiFi connection to router.
-6. Direct or mesh work mode.
+1. LAN or WiFi connection to router.
+2. Direct or mesh work mode.
+3. Automatically adds gateway configuration to Home Assistan via MQTT discovery as a binary_sensor.
+4. Automatically adds supported devices configurations to Home Assistan via MQTT discovery.
+5. Update firmware from HTTPS server via OTA (optional).
+6. Update firmware of supported devices from HTTPS server via ESP-NOW (optional).
+7. Receive time from NTP server and transmit it to supported devices (optional).
+8. Transmitting system information to Syslog server (optional).
 
 ## Notes
 
 1. All devices on the network must have the same work mode.
 2. ESP-NOW mesh network based on the [zh_network](https://github.com/aZholtikov/zh_network).
-3. For initial settings use "menuconfig -> ZH Gateway Configuration". After first boot all settings (except work mode) will be stored in NVS memory for prevente change during OTA firmware update.
+3. For initial settings use "menuconfig -> ZH Gateway Configuration". After first boot all settings (except work mode) will be stored in NVS memory for prevente change during OTA firmware update. But it is highly recommended to set up the configuration via menuconfig before updating.
 4. To restart the gateway, send the "restart" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7").
-5. To update the gateway firmware, send the "update" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7"). The update path should be like as "https://your_server/zh_gateway_esp32.bin". The online status of the update is displayed in the root gateway topic.
+5. To update the gateway firmware, send the "update" command to the root topic of the gateway (example - "homeassistant/gateway/70-03-9F-44-BE-F7"). The update path should be like as "https://your_server/zh_gateway_esp32.bin". The online status of the update is displayed in the root gateway topic and Syslog server (if enabled).
 
 ## Build and flash
 

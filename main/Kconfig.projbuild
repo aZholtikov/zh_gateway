@@ -48,19 +48,55 @@ menu "ZH Gateway Configuration"
 		help
 			MQTT topic prefix.
 
+	config SYSLOG_SERVER_USING
+		bool "Enable using Syslog server"
+		default true
+		help
+			Enable using Syslog server.
+
+	config SYSLOG_SERVER_IP
+		depends on SYSLOG_SERVER_USING
+		string "Syslog server IP"
+		default "192.168.1.2"
+		help
+			Syslog server IP.
+
+	config SYSLOG_SERVER_PORT
+		depends on SYSLOG_SERVER_USING
+		int "Syslog server port"
+		range 0 65635
+		default 514
+		help
+			Syslog server port.
+	
+	config NTP_SERVER_USING
+		bool "Enable using NTP server"
+		default true
+		help
+			Enable using NTP server.
+
 	config NTP_SERVER_URL
+		depends on NTP_SERVER_USING
 		string "NTP server url"
 		default "ntpserver.com"
 		help
 			NTP server url.
 
 	config NTP_TIME_ZONE
+		depends on NTP_SERVER_USING
 		string "NTP time zone"
 		default "UTC-3"
 		help
 			NTP time zone.
 
+	config FIRMWARE_UPGRADE_SERVER_USING
+		bool "Enable using OTA update"
+		default true
+		help
+			Enable using OTA update.
+
 	config FIRMWARE_UPGRADE_URL
+		depends on FIRMWARE_UPGRADE_SERVER_USING
 		string "Firmware upgrade url"
 		default "https://yourserver.com"
 		help

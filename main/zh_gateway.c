@@ -99,10 +99,11 @@ void zh_load_config(gateway_config_t *gateway_config)
     {
         nvs_set_u8(nvs_handle, "present", 0xFE);
         nvs_close(nvs_handle);
+    SETUP_INITIAL_SETTINGS:
 #ifdef CONFIG_CONNECTION_TYPE_LAN
         gateway_config->software_config.is_lan_mode = true;
-        strcpy(gateway_config->software_config.ssid_name, "ssid");
-        strcpy(gateway_config->software_config.ssid_password, "password");
+        strcpy(gateway_config->software_config.ssid_name, "NULL");
+        strcpy(gateway_config->software_config.ssid_password, "NULL");
 #else
         gateway_config->software_config.is_lan_mode = false;
         strcpy(gateway_config->software_config.ssid_name, CONFIG_WIFI_SSID_NAME);
@@ -110,29 +111,62 @@ void zh_load_config(gateway_config_t *gateway_config)
 #endif
         strcpy(gateway_config->software_config.mqtt_broker_url, CONFIG_MQTT_BROKER_URL);
         strcpy(gateway_config->software_config.mqtt_topic_prefix, CONFIG_MQTT_TOPIC_PREFIX);
+#ifdef CONFIG_SYSLOG_SERVER_USING
+        gateway_config->software_config.is_syslog_server_usage = true;
+        strcpy(gateway_config->software_config.syslog_server_ip, CONFIG_SYSLOG_SERVER_IP);
+        gateway_config->software_config.syslog_server_port = CONFIG_SYSLOG_SERVER_PORT;
+#else
+        gateway_config->software_config.is_syslog_server_usage = false;
+        strcpy(gateway_config->software_config.syslog_server_ip, "NULL");
+        gateway_config->software_config.syslog_server_port = 0;
+#endif
+#ifdef CONFIG_NTP_SERVER_USING
+        gateway_config->software_config.is_ntp_server_usage = true;
         strcpy(gateway_config->software_config.ntp_server_url, CONFIG_NTP_SERVER_URL);
         strcpy(gateway_config->software_config.ntp_time_zone, CONFIG_NTP_TIME_ZONE);
+#else
+        gateway_config->software_config.is_ntp_server_usage = false;
+        strcpy(gateway_config->software_config.ntp_server_url, "NULL");
+        strcpy(gateway_config->software_config.ntp_time_zone, "NULL");
+#endif
+#ifdef CONFIG_FIRMWARE_UPGRADE_SERVER_USING
+        gateway_config->software_config.is_ota_server_usage = true;
         strcpy(gateway_config->software_config.firmware_upgrade_url, CONFIG_FIRMWARE_UPGRADE_URL);
+#else
+        gateway_config->software_config.is_ota_server_usage = false;
+        strcpy(gateway_config->software_config.firmware_upgrade_url, "NULL");
+#endif
         zh_save_config(gateway_config);
         return;
     }
-    nvs_get_u8(nvs_handle, "lan_mode", (uint8_t *)&gateway_config->software_config.is_lan_mode);
+    esp_err_t err = ESP_OK;
     size_t size = 0;
-    nvs_get_str(nvs_handle, "ssid_name", NULL, &size);
-    nvs_get_str(nvs_handle, "ssid_name", gateway_config->software_config.ssid_name, &size);
-    nvs_get_str(nvs_handle, "ssid_password", NULL, &size);
-    nvs_get_str(nvs_handle, "ssid_password", gateway_config->software_config.ssid_password, &size);
-    nvs_get_str(nvs_handle, "mqtt_url", NULL, &size);
-    nvs_get_str(nvs_handle, "mqtt_url", gateway_config->software_config.mqtt_broker_url, &size);
-    nvs_get_str(nvs_handle, "topic_prefix", NULL, &size);
-    nvs_get_str(nvs_handle, "topic_prefix", gateway_config->software_config.mqtt_topic_prefix, &size);
-    nvs_get_str(nvs_handle, "ntp_url", NULL, &size);
-    nvs_get_str(nvs_handle, "ntp_url", gateway_config->software_config.ntp_server_url, &size);
-    nvs_get_str(nvs_handle, "time_zone", NULL, &size);
-    nvs_get_str(nvs_handle, "time_zone", gateway_config->software_config.ntp_time_zone, &size);
-    nvs_get_str(nvs_handle, "upgrade_url", NULL, &size);
-    nvs_get_str(nvs_handle, "upgrade_url", gateway_config->software_config.firmware_upgrade_url, &size);
+    err += nvs_get_u8(nvs_handle, "lan_mode", (uint8_t *)&gateway_config->software_config.is_lan_mode);
+    err += nvs_get_str(nvs_handle, "ssid_name", NULL, &size);
+    err += nvs_get_str(nvs_handle, "ssid_name", gateway_config->software_config.ssid_name, &size);
+    err += nvs_get_str(nvs_handle, "ssid_password", NULL, &size);
+    err += nvs_get_str(nvs_handle, "ssid_password", gateway_config->software_config.ssid_password, &size);
+    err += nvs_get_str(nvs_handle, "mqtt_url", NULL, &size);
+    err += nvs_get_str(nvs_handle, "mqtt_url", gateway_config->software_config.mqtt_broker_url, &size);
+    err += nvs_get_str(nvs_handle, "topic_prefix", NULL, &size);
+    err += nvs_get_str(nvs_handle, "topic_prefix", gateway_config->software_config.mqtt_topic_prefix, &size);
+    err += nvs_get_u8(nvs_handle, "syslog_usage", (uint8_t *)&gateway_config->software_config.is_syslog_server_usage);
+    err += nvs_get_str(nvs_handle, "syslog_ip", NULL, &size);
+    err += nvs_get_str(nvs_handle, "syslog_ip", gateway_config->software_config.syslog_server_ip, &size);
+    err += nvs_get_u32(nvs_handle, "syslog_port", &gateway_config->software_config.syslog_server_port);
+    err += nvs_get_u8(nvs_handle, "ntp_usage", (uint8_t *)&gateway_config->software_config.is_ntp_server_usage);
+    err += nvs_get_str(nvs_handle, "ntp_url", NULL, &size);
+    err += nvs_get_str(nvs_handle, "ntp_url", gateway_config->software_config.ntp_server_url, &size);
+    err += nvs_get_str(nvs_handle, "time_zone", NULL, &size);
+    err += nvs_get_str(nvs_handle, "time_zone", gateway_config->software_config.ntp_time_zone, &size);
+    err += nvs_get_u8(nvs_handle, "ota_usage", (uint8_t *)&gateway_config->software_config.is_ota_server_usage);
+    err += nvs_get_str(nvs_handle, "upgrade_url", NULL, &size);
+    err += nvs_get_str(nvs_handle, "upgrade_url", gateway_config->software_config.firmware_upgrade_url, &size);
     nvs_close(nvs_handle);
+    if (err != ESP_OK)
+    {
+        goto SETUP_INITIAL_SETTINGS;
+    }
 }
 
 void zh_save_config(const gateway_config_t *gateway_config)
@@ -144,8 +178,13 @@ void zh_save_config(const gateway_config_t *gateway_config)
     nvs_set_str(nvs_handle, "ssid_password", gateway_config->software_config.ssid_password);
     nvs_set_str(nvs_handle, "mqtt_url", gateway_config->software_config.mqtt_broker_url);
     nvs_set_str(nvs_handle, "topic_prefix", gateway_config->software_config.mqtt_topic_prefix);
+    nvs_set_u8(nvs_handle, "syslog_usage", gateway_config->software_config.is_syslog_server_usage);
+    nvs_set_str(nvs_handle, "syslog_ip", gateway_config->software_config.syslog_server_ip);
+    nvs_set_u32(nvs_handle, "syslog_port", gateway_config->software_config.syslog_server_port);
+    nvs_set_u8(nvs_handle, "ntp_usage", gateway_config->software_config.is_ntp_server_usage);
     nvs_set_str(nvs_handle, "ntp_url", gateway_config->software_config.ntp_server_url);
     nvs_set_str(nvs_handle, "time_zone", gateway_config->software_config.ntp_time_zone);
+    nvs_set_u8(nvs_handle, "ota_usage", gateway_config->software_config.is_ota_server_usage);
     nvs_set_str(nvs_handle, "upgrade_url", gateway_config->software_config.firmware_upgrade_url);
     nvs_close(nvs_handle);
 }
@@ -161,11 +200,22 @@ void zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_
             esp_mqtt_client_stop(gateway_config->mqtt_client);
             gateway_config->mqtt_is_enable = false;
         }
-        if (gateway_config->sntp_is_enable == true)
+        if (gateway_config->software_config.is_ntp_server_usage == true)
         {
-            esp_sntp_stop();
-            gateway_config->sntp_is_enable = false;
-            vTaskDelete(gateway_config->gateway_current_time_task);
+            if (gateway_config->sntp_is_enable == true)
+            {
+                esp_sntp_stop();
+                gateway_config->sntp_is_enable = false;
+                vTaskDelete(gateway_config->gateway_current_time_task);
+            }
+        }
+        if (gateway_config->software_config.is_syslog_server_usage == true)
+        {
+            if (gateway_config->syslog_is_enable == true)
+            {
+                zh_syslog_deinit();
+                gateway_config->syslog_is_enable = false;
+            }
         }
         break;
     case IP_EVENT_ETH_GOT_IP:
@@ -179,14 +229,25 @@ void zh_eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_
             esp_mqtt_client_start(gateway_config->mqtt_client);
             gateway_config->mqtt_is_enable = true;
         }
-        if (gateway_config->sntp_is_enable == false)
+        if (gateway_config->software_config.is_ntp_server_usage == true)
         {
-            esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
-            sntp_set_sync_mode(SNTP_SYNC_MODE_SMOOTH);
-            esp_sntp_setservername(0, gateway_config->software_config.ntp_server_url);
-            esp_sntp_init();
-            gateway_config->sntp_is_enable = true;
-            xTaskCreatePinnedToCore(&zh_send_espnow_current_time_task, "NULL", ZH_SNTP_STACK_SIZE, gateway_config, ZH_SNTP_TASK_PRIORITY, (TaskHandle_t *)&gateway_config->gateway_current_time_task, tskNO_AFFINITY);
+            if (gateway_config->sntp_is_enable == false)
+            {
+                esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+                sntp_set_sync_mode(SNTP_SYNC_MODE_SMOOTH);
+                esp_sntp_setservername(0, gateway_config->software_config.ntp_server_url);
+                esp_sntp_init();
+                gateway_config->sntp_is_enable = true;
+                xTaskCreatePinnedToCore(&zh_send_espnow_current_time_task, "NULL", ZH_SNTP_STACK_SIZE, gateway_config, ZH_SNTP_TASK_PRIORITY, (TaskHandle_t *)&gateway_config->gateway_current_time_task, tskNO_AFFINITY);
+            }
+        }
+        if (gateway_config->software_config.is_syslog_server_usage == true)
+        {
+            zh_syslog_init_config_t syslog_init_config = ZH_SYSLOG_INIT_CONFIG_DEFAULT();
+            memcpy(syslog_init_config.syslog_ip, gateway_config->software_config.syslog_server_ip, strlen(gateway_config->software_config.syslog_server_ip));
+            syslog_init_config.syslog_port = gateway_config->software_config.syslog_server_port;
+            zh_syslog_init(&syslog_init_config);
+            gateway_config->syslog_is_enable = true;
         }
         break;
     default:
@@ -208,11 +269,22 @@ void zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             esp_mqtt_client_stop(gateway_config->mqtt_client);
             gateway_config->mqtt_is_enable = false;
         }
-        if (gateway_config->sntp_is_enable == true)
+        if (gateway_config->software_config.is_ntp_server_usage == true)
         {
-            esp_sntp_stop();
-            gateway_config->sntp_is_enable = false;
-            vTaskDelete(gateway_config->gateway_current_time_task);
+            if (gateway_config->sntp_is_enable == true)
+            {
+                esp_sntp_stop();
+                gateway_config->sntp_is_enable = false;
+                vTaskDelete(gateway_config->gateway_current_time_task);
+            }
+        }
+        if (gateway_config->software_config.is_syslog_server_usage == true)
+        {
+            if (gateway_config->syslog_is_enable == true)
+            {
+                zh_syslog_deinit();
+                gateway_config->syslog_is_enable = false;
+            }
         }
         if (gateway_config->wifi_reconnect_retry_num < ZH_WIFI_MAXIMUM_RETRY)
         {
@@ -240,14 +312,25 @@ void zh_wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             esp_mqtt_client_start(gateway_config->mqtt_client);
             gateway_config->mqtt_is_enable = true;
         }
-        if (gateway_config->sntp_is_enable == false)
+        if (gateway_config->software_config.is_ntp_server_usage == true)
         {
-            esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
-            sntp_set_sync_mode(SNTP_SYNC_MODE_SMOOTH);
-            esp_sntp_setservername(0, gateway_config->software_config.ntp_server_url);
-            esp_sntp_init();
-            gateway_config->sntp_is_enable = true;
-            xTaskCreatePinnedToCore(&zh_send_espnow_current_time_task, "NULL", ZH_SNTP_STACK_SIZE, gateway_config, ZH_SNTP_TASK_PRIORITY, (TaskHandle_t *)&gateway_config->gateway_current_time_task, tskNO_AFFINITY);
+            if (gateway_config->sntp_is_enable == false)
+            {
+                esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+                sntp_set_sync_mode(SNTP_SYNC_MODE_SMOOTH);
+                esp_sntp_setservername(0, gateway_config->software_config.ntp_server_url);
+                esp_sntp_init();
+                gateway_config->sntp_is_enable = true;
+                xTaskCreatePinnedToCore(&zh_send_espnow_current_time_task, "NULL", ZH_SNTP_STACK_SIZE, gateway_config, ZH_SNTP_TASK_PRIORITY, (TaskHandle_t *)&gateway_config->gateway_current_time_task, tskNO_AFFINITY);
+            }
+        }
+        if (gateway_config->software_config.is_syslog_server_usage == true)
+        {
+            zh_syslog_init_config_t syslog_init_config = ZH_SYSLOG_INIT_CONFIG_DEFAULT();
+            memcpy(syslog_init_config.syslog_ip, gateway_config->software_config.syslog_server_ip, strlen(gateway_config->software_config.syslog_server_ip));
+            syslog_init_config.syslog_port = gateway_config->software_config.syslog_server_port;
+            zh_syslog_init(&syslog_init_config);
+            gateway_config->syslog_is_enable = true;
         }
         break;
     default:
@@ -310,17 +393,31 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
             {
             case ZHDT_SWITCH:
                 zh_espnow_switch_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
+                goto ZHPT_CONFIG_SEND_SYSLOG;
                 break;
             case ZHDT_LED:
                 zh_espnow_led_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
+                goto ZHPT_CONFIG_SEND_SYSLOG;
                 break;
             case ZHDT_SENSOR:
                 zh_espnow_sensor_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
+                goto ZHPT_CONFIG_SEND_SYSLOG;
                 break;
             case ZHDT_BINARY_SENSOR:
                 zh_espnow_binary_sensor_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
+                goto ZHPT_CONFIG_SEND_SYSLOG;
                 break;
             default:
+                break;
+            ZHPT_CONFIG_SEND_SYSLOG:
+                if (gateway_config->syslog_is_enable == true)
+                {
+                    char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+                    memset(mac, 0, 18);
+                    sprintf(mac, "" MAC_STR "", MAC2STR(recv_data->mac_addr));
+                    zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(data->device_type), "Connected to gateway.");
+                    heap_caps_free(mac);
+                }
                 break;
             }
             break;
@@ -378,9 +475,35 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
             break;
         case ZHPT_UPDATE_FAIL:
             esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_fail", 0, 2, true);
+            if (gateway_config->syslog_is_enable == true)
+            {
+                char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+                memset(mac, 0, 18);
+                sprintf(mac, "" MAC_STR "", MAC2STR(recv_data->mac_addr));
+                zh_syslog_send(ZH_USER, ZH_ERR, mac, zh_get_device_type_value_name(data->device_type), "Firmware update fail. Incorrect bin file.");
+                heap_caps_free(mac);
+            }
             break;
         case ZHPT_UPDATE_SUCCESS:
             esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_success", 0, 2, true);
+            if (gateway_config->syslog_is_enable == true)
+            {
+                char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+                memset(mac, 0, 18);
+                sprintf(mac, "" MAC_STR "", MAC2STR(recv_data->mac_addr));
+                zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(data->device_type), "Firmware update success.");
+                heap_caps_free(mac);
+            }
+            break;
+        case ZHPT_ERROR:
+            if (gateway_config->syslog_is_enable == true)
+            {
+                char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+                memset(mac, 0, 18);
+                sprintf(mac, "" MAC_STR "", MAC2STR(recv_data->mac_addr));
+                zh_syslog_send(ZH_USER, ZH_ERR, mac, zh_get_device_type_value_name(data->device_type), data->payload_data.status_message.error_message.message);
+                heap_caps_free(mac);
+            }
             break;
         default:
             break;
@@ -413,6 +536,14 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
     case MQTT_EVENT_CONNECTED:
         if (gateway_config->mqtt_is_connected == false)
         {
+            if (gateway_config->syslog_is_enable == true)
+            {
+                char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+                memset(mac, 0, 18);
+                sprintf(mac, "" MAC_STR "", MAC2STR(gateway_config->self_mac));
+                zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(ZHDT_GATEWAY), "Connected to MQTT.");
+                heap_caps_free(mac);
+            }
             char *topic_for_subscribe = NULL;
             char *supported_device_type = NULL;
             for (zh_device_type_t i = 1; i <= ZHDT_MAX; ++i)
@@ -434,6 +565,14 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
     case MQTT_EVENT_DISCONNECTED:
         if (gateway_config->mqtt_is_connected == true)
         {
+            if (gateway_config->syslog_is_enable == true)
+            {
+                char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+                memset(mac, 0, 18);
+                sprintf(mac, "" MAC_STR "", MAC2STR(gateway_config->self_mac));
+                zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(ZHDT_GATEWAY), "Disconnected from MQTT.");
+                heap_caps_free(mac);
+            }
             vTaskDelete(gateway_config->gateway_attributes_message_task);
             vTaskDelete(gateway_config->gateway_keep_alive_message_task);
             vTaskDelete(gateway_config->device_availability_check_task);
@@ -500,7 +639,7 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             {
                 if (memcmp(gateway_config->self_mac, incoming_data_mac, 6) == 0)
                 {
-                    if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0)
+                    if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0 && gateway_config->software_config.is_ota_server_usage == true)
                     {
                         if (xSemaphoreTake(gateway_config->self_ota_in_progress_mutex, portTICK_PERIOD_MS) == pdTRUE)
                         {
@@ -529,7 +668,7 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             switch (incoming_data_payload_type)
             {
             case ZHPT_NONE:
-                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0)
+                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0 && gateway_config->software_config.is_ota_server_usage == true)
                 {
                     data.payload_type = ZHPT_UPDATE;
                     zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
@@ -628,7 +767,7 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             switch (incoming_data_payload_type)
             {
             case ZHPT_NONE:
-                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0)
+                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0 && gateway_config->software_config.is_ota_server_usage == true)
                 {
                     data.payload_type = ZHPT_UPDATE;
                     zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
@@ -735,7 +874,7 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             switch (incoming_data_payload_type)
             {
             case ZHPT_NONE:
-                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0)
+                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0 && gateway_config->software_config.is_ota_server_usage == true)
                 {
                     data.payload_type = ZHPT_UPDATE;
                     zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
@@ -798,7 +937,7 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             switch (incoming_data_payload_type)
             {
             case ZHPT_NONE:
-                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0)
+                if (strncmp(incoming_payload, "update", strlen(incoming_payload) + 1) == 0 && gateway_config->software_config.is_ota_server_usage == true)
                 {
                     data.payload_type = ZHPT_UPDATE;
                     zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
@@ -827,6 +966,9 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
 void zh_self_ota_update_task(void *pvParameter)
 {
     gateway_config_t *gateway_config = pvParameter;
+    char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+    memset(mac, 0, 18);
+    sprintf(mac, "" MAC_STR "", MAC2STR(gateway_config->self_mac));
     xSemaphoreTake(gateway_config->self_ota_in_progress_mutex, portMAX_DELAY);
     char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(ZHDT_GATEWAY)) + 20, MALLOC_CAP_8BIT);
     memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(ZHDT_GATEWAY)) + 20);
@@ -835,6 +977,10 @@ void zh_self_ota_update_task(void *pvParameter)
     esp_ota_handle_t update_handle = {0};
     const esp_partition_t *update_partition = NULL;
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_begin", 0, 2, true);
+    if (gateway_config->syslog_is_enable == true)
+    {
+        zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(ZHDT_GATEWAY), "Firmware update begin.");
+    }
     const esp_app_desc_t *app_info = esp_app_get_description();
     char *app_name = (char *)heap_caps_malloc(strlen(gateway_config->software_config.firmware_upgrade_url) + strlen(app_info->project_name) + 6, MALLOC_CAP_8BIT);
     memset(app_name, 0, strlen(gateway_config->software_config.firmware_upgrade_url) + strlen(app_info->project_name) + 6);
@@ -852,6 +998,10 @@ void zh_self_ota_update_task(void *pvParameter)
     esp_http_client_fetch_headers(https_client);
     update_partition = esp_ota_get_next_update_partition(NULL);
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_progress", 0, 2, true);
+    if (gateway_config->syslog_is_enable == true)
+    {
+        zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(ZHDT_GATEWAY), "Firmware update progress.");
+    }
     esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &update_handle);
     for (;;)
     {
@@ -861,7 +1011,12 @@ void zh_self_ota_update_task(void *pvParameter)
             esp_http_client_close(https_client);
             esp_http_client_cleanup(https_client);
             esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_error_data_size", 0, 2, true);
+            if (gateway_config->syslog_is_enable == true)
+            {
+                zh_syslog_send(ZH_USER, ZH_ERR, mac, zh_get_device_type_value_name(ZHDT_GATEWAY), "Firmware update error. Incorrect size of read data.");
+            }
             heap_caps_free(topic);
+            heap_caps_free(mac);
             xSemaphoreGive(gateway_config->self_ota_in_progress_mutex);
             vTaskDelete(NULL);
         }
@@ -879,7 +1034,12 @@ void zh_self_ota_update_task(void *pvParameter)
         esp_http_client_close(https_client);
         esp_http_client_cleanup(https_client);
         esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_fail", 0, 2, true);
+        if (gateway_config->syslog_is_enable == true)
+        {
+            zh_syslog_send(ZH_USER, ZH_ERR, mac, zh_get_device_type_value_name(ZHDT_GATEWAY), "Firmware update fail. Incorrect bin file.");
+        }
         heap_caps_free(topic);
+        heap_caps_free(mac);
         xSemaphoreGive(gateway_config->self_ota_in_progress_mutex);
         vTaskDelete(NULL);
     }
@@ -887,7 +1047,12 @@ void zh_self_ota_update_task(void *pvParameter)
     esp_http_client_close(https_client);
     esp_http_client_cleanup(https_client);
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_success", 0, 2, true);
+    if (gateway_config->syslog_is_enable == true)
+    {
+        zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(ZHDT_GATEWAY), "Firmware update success.");
+    }
     heap_caps_free(topic);
+    heap_caps_free(mac);
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
     data.payload_type = ZHPT_KEEP_ALIVE;
@@ -900,6 +1065,10 @@ void zh_self_ota_update_task(void *pvParameter)
 void zh_espnow_ota_update_task(void *pvParameter)
 {
     gateway_config_t *gateway_config = pvParameter;
+    char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+    memset(mac, 0, 18);
+    sprintf(mac, "" MAC_STR "", MAC2STR(gateway_config->espnow_ota_data.mac_addr));
+    // heap_caps_free(mac);
     xSemaphoreTake(gateway_config->espnow_ota_in_progress_mutex, portMAX_DELAY);
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
@@ -907,6 +1076,10 @@ void zh_espnow_ota_update_task(void *pvParameter)
     memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type)) + 20);
     sprintf(topic, "%s/%s/" MAC_STR, gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), MAC2STR(gateway_config->espnow_ota_data.mac_addr));
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_begin", 0, 2, true);
+    if (gateway_config->syslog_is_enable == true)
+    {
+        zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), "Firmware update begin.");
+    }
     char espnow_ota_write_data[sizeof(data.payload_data.ota_message.espnow_ota_message.data) + 1] = {0};
     char *app_name = (char *)heap_caps_malloc(strlen(gateway_config->software_config.firmware_upgrade_url) + strlen(gateway_config->espnow_ota_data.app_name) + 6, MALLOC_CAP_8BIT);
     memset(app_name, 0, strlen(gateway_config->software_config.firmware_upgrade_url) + strlen(gateway_config->espnow_ota_data.app_name) + 6);
@@ -931,11 +1104,20 @@ void zh_espnow_ota_update_task(void *pvParameter)
         data.payload_type = ZHPT_UPDATE_ERROR;
         zh_send_message(gateway_config->espnow_ota_data.mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
         esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_error_begin_timeout", 0, 2, true);
+        if (gateway_config->syslog_is_enable == true)
+        {
+            zh_syslog_send(ZH_USER, ZH_ERR, mac, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), "Firmware update error. Timeout exceed.");
+        }
+        heap_caps_free(mac);
         heap_caps_free(topic);
         xSemaphoreGive(gateway_config->espnow_ota_in_progress_mutex);
         vTaskDelete(NULL);
     }
     esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_progress", 0, 2, true);
+    if (gateway_config->syslog_is_enable == true)
+    {
+        zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), "Firmware update progress.");
+    }
     for (;;)
     {
         int data_read_size = esp_http_client_read(https_client, espnow_ota_write_data, sizeof(data.payload_data.ota_message.espnow_ota_message.data));
@@ -944,6 +1126,11 @@ void zh_espnow_ota_update_task(void *pvParameter)
             esp_http_client_close(https_client);
             esp_http_client_cleanup(https_client);
             esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_error_data_size", 0, 2, true);
+            if (gateway_config->syslog_is_enable == true)
+            {
+                zh_syslog_send(ZH_USER, ZH_ERR, mac, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), "Firmware update error. Incorrect size of read data.");
+            }
+            heap_caps_free(mac);
             heap_caps_free(topic);
             xSemaphoreGive(gateway_config->espnow_ota_in_progress_mutex);
             vTaskDelete(NULL);
@@ -962,6 +1149,11 @@ void zh_espnow_ota_update_task(void *pvParameter)
                 data.payload_type = ZHPT_UPDATE_ERROR;
                 zh_send_message(gateway_config->espnow_ota_data.mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_error_progress_timeout", 0, 2, true);
+                if (gateway_config->syslog_is_enable == true)
+                {
+                    zh_syslog_send(ZH_USER, ZH_ERR, mac, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), "Firmware update error. Timeout exceed.");
+                }
+                heap_caps_free(mac);
                 heap_caps_free(topic);
                 xSemaphoreGive(gateway_config->espnow_ota_in_progress_mutex);
                 vTaskDelete(NULL);
@@ -974,6 +1166,11 @@ void zh_espnow_ota_update_task(void *pvParameter)
             data.payload_type = ZHPT_UPDATE_END;
             zh_send_message(gateway_config->espnow_ota_data.mac_addr, (uint8_t *)&data, sizeof(zh_espnow_data_t));
             esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "update_end", 0, 2, true);
+            if (gateway_config->syslog_is_enable == true)
+            {
+                zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(gateway_config->espnow_ota_data.device_type), "Firmware update end.");
+            }
+            heap_caps_free(mac);
             heap_caps_free(topic);
             xSemaphoreGive(gateway_config->espnow_ota_in_progress_mutex);
             vTaskDelete(NULL);
@@ -987,6 +1184,14 @@ void zh_send_espnow_current_time_task(void *pvParameter)
     while (sntp_get_sync_status() != SNTP_SYNC_STATUS_COMPLETED)
     {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+    if (gateway_config->syslog_is_enable == true)
+    {
+        char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+        memset(mac, 0, 18);
+        sprintf(mac, "" MAC_STR "", MAC2STR(gateway_config->self_mac));
+        zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(ZHDT_GATEWAY), "Connected to NTP.");
+        heap_caps_free(mac);
     }
     time_t now;
     setenv("TZ", gateway_config->software_config.ntp_time_zone, 1);
@@ -1021,6 +1226,14 @@ void zh_device_availability_check_task(void *pvParameter)
                 sprintf(topic, "%s/%s/" MAC_STR "/status", gateway_config->software_config.mqtt_topic_prefix, zh_get_device_type_value_name(available_device->device_type), MAC2STR(available_device->mac_addr));
                 esp_mqtt_client_publish(gateway_config->mqtt_client, topic, "offline", 0, 2, true);
                 heap_caps_free(topic);
+                if (gateway_config->syslog_is_enable == true)
+                {
+                    char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+                    memset(mac, 0, 18);
+                    sprintf(mac, "" MAC_STR "", MAC2STR(available_device->mac_addr));
+                    zh_syslog_send(ZH_USER, ZH_WARNING, mac, zh_get_device_type_value_name(available_device->device_type), "Disconnected from gateway.");
+                    heap_caps_free(mac);
+                }
                 zh_vector_delete_item(&gateway_config->available_device_vector, i);
                 goto CHECK; // Since the vector is shifted after item deletion, the item needs to be re-checked.
             }
@@ -1705,7 +1918,7 @@ void zh_espnow_sensor_send_mqtt_json_status_message(const zh_espnow_data_t *devi
     case HAST_DHT:
     case HAST_AHT:
     case HAST_SHT:
-    case HAST_HTU21D:
+    case HAST_HTU:
     case HAST_HDC1080:
         sprintf(temperature, "%f", device_data->payload_data.status_message.sensor_status_message.temperature);
         zh_json_add(&json, "temperature", temperature);

@@ -17,6 +17,7 @@
 #include "mqtt_client.h"
 #include "zh_json.h"
 #include "zh_vector.h"
+#include "zh_syslog.h"
 #include "zh_config.h"
 
 #ifdef CONFIG_NETWORK_TYPE_DIRECT
@@ -72,11 +73,17 @@ typedef struct // Structure of data exchange between tasks, functions and event 
         char ssid_password[64];        // WiFi password.
         char mqtt_broker_url[64];      // MQTT broker url.
         char mqtt_topic_prefix[32];    // MQTT topic prefix.
+        bool is_syslog_server_usage;   // Syslog server usage flag.
+        char syslog_server_ip[16];     // Syslog server IP address.
+        uint32_t syslog_server_port;   // Syslog server port.
+        bool is_ntp_server_usage;      // NTP server usage flag.
         char ntp_server_url[64];       // NTP server url.
         char ntp_time_zone[10];        // NTP time zone.
+        bool is_ota_server_usage;      // OTA server usage flag.
         char firmware_upgrade_url[64]; // Firmware upgrade url.
     } software_config;
     uint8_t self_mac[6];                          // Gateway MAC address. @note Depends at WiFi operation mode.
+    bool syslog_is_enable;                        // Syslog client operation status flag. @note Used to control the Syslog functions when the network connection is established / lost.
     bool sntp_is_enable;                          // SNTP client operation status flag. @note Used to control the SNTP functions when the network connection is established / lost.
     bool mqtt_is_enable;                          // MQTT client operation status flag. @note Used to control the MQTT functions when the network connection is established / lost.
     bool mqtt_is_connected;                       // MQTT broker connection status flag. @note Used to control the gateway system tasks when the MQTT connection is established / lost.

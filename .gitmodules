@@ -13,3 +13,6 @@
 [submodule "components/zh_espnow"]
 	path = components/zh_espnow
 	url = https://github.com/aZholtikov/zh_espnow
+[submodule "components/zh_syslog"]
+	path = components/zh_syslog
+	url = https://github.com/aZholtikov/zh_syslog
