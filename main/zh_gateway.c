@@ -370,13 +370,23 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
         case ZHPT_KEEP_ALIVE:
             if (xSemaphoreTake(gateway_config->device_check_in_progress_mutex, portTICK_PERIOD_MS) == pdTRUE)
             {
+                bool is_found = false;
                 for (uint16_t i = 0; i < zh_vector_get_size(&gateway_config->available_device_vector); ++i)
                 {
                     available_device_t *available_device = zh_vector_get_item(&gateway_config->available_device_vector, i);
                     if (memcmp(recv_data->mac_addr, available_device->mac_addr, 6) == 0)
                     {
                         zh_vector_delete_item(&gateway_config->available_device_vector, i);
+                        is_found = true;
                     }
+                }
+                if (gateway_config->syslog_is_enable == true && is_found == false)
+                {
+                    char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+                    memset(mac, 0, 18);
+                    sprintf(mac, "" MAC_STR "", MAC2STR(recv_data->mac_addr));
+                    zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(data->device_type), "Connected to gateway.");
+                    heap_caps_free(mac);
                 }
                 available_device_t available_device = {0};
                 available_device.device_type = data->device_type;
@@ -393,31 +403,17 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
             {
             case ZHDT_SWITCH:
                 zh_espnow_switch_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
-                goto ZHPT_CONFIG_SEND_SYSLOG;
                 break;
             case ZHDT_LED:
                 zh_espnow_led_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
-                goto ZHPT_CONFIG_SEND_SYSLOG;
                 break;
             case ZHDT_SENSOR:
                 zh_espnow_sensor_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
-                goto ZHPT_CONFIG_SEND_SYSLOG;
                 break;
             case ZHDT_BINARY_SENSOR:
                 zh_espnow_binary_sensor_send_mqtt_json_config_message(data, recv_data->mac_addr, gateway_config);
-                goto ZHPT_CONFIG_SEND_SYSLOG;
                 break;
             default:
-                break;
-            ZHPT_CONFIG_SEND_SYSLOG:
-                if (gateway_config->syslog_is_enable == true)
-                {
-                    char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
-                    memset(mac, 0, 18);
-                    sprintf(mac, "" MAC_STR "", MAC2STR(recv_data->mac_addr));
-                    zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(data->device_type), "Connected to gateway.");
-                    heap_caps_free(mac);
-                }
                 break;
             }
             break;
