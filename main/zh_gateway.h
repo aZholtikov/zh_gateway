@@ -64,6 +64,8 @@
 
 #define ZH_MAX_GPIO_NUMBERS 48 // Maximum number of GPIOs on ESP modules.
 
+#define ZH_GATEWAY_KEEP_ALIVE_MESSAGE_TIME 10 // Frequency of sending a keep alive message (in seconds).
+
 typedef struct // Structure of data exchange between tasks, functions and event handlers.
 {
     struct // Storage structure of gateway configuration data.

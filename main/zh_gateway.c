@@ -36,7 +36,7 @@ void app_main(void)
         wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
         esp_wifi_init(&wifi_init_config);
         esp_wifi_set_mode(WIFI_MODE_STA);
-        esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B);
+        esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR);
         esp_wifi_start();
         esp_read_mac(gateway_config->self_mac, ESP_MAC_WIFI_STA);
     }
@@ -49,7 +49,7 @@ void app_main(void)
         memcpy(wifi_config.sta.ssid, gateway_config->software_config.ssid_name, strlen(gateway_config->software_config.ssid_name));
         memcpy(wifi_config.sta.password, gateway_config->software_config.ssid_password, strlen(gateway_config->software_config.ssid_password));
         esp_wifi_set_mode(WIFI_MODE_APSTA);
-        esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
+        esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR);
         esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
         esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &zh_wifi_event_handler, gateway_config, NULL);
         esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &zh_wifi_event_handler, gateway_config, NULL);
@@ -380,20 +380,30 @@ void zh_espnow_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
                         is_found = true;
                     }
                 }
-                if (gateway_config->syslog_is_enable == true && is_found == false)
+                char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
+                memset(mac, 0, 18);
+                sprintf(mac, "" MAC_STR "", MAC2STR(recv_data->mac_addr));
+                if (data->payload_data.keep_alive_message.online_status == ZH_ONLINE)
                 {
-                    char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
-                    memset(mac, 0, 18);
-                    sprintf(mac, "" MAC_STR "", MAC2STR(recv_data->mac_addr));
-                    zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(data->device_type), "Connected to gateway.");
-                    heap_caps_free(mac);
+                    available_device_t available_device = {0};
+                    available_device.device_type = data->device_type;
+                    memcpy(available_device.mac_addr, recv_data->mac_addr, 6);
+                    available_device.frequency = data->payload_data.keep_alive_message.message_frequency;
+                    available_device.time = esp_timer_get_time() / 1000000;
+                    zh_vector_push_back(&gateway_config->available_device_vector, &available_device);
+                    if (gateway_config->syslog_is_enable == true && is_found == false)
+                    {
+                        zh_syslog_send(ZH_USER, ZH_INFO, mac, zh_get_device_type_value_name(data->device_type), "Connected to gateway.");
+                    }
                 }
-                available_device_t available_device = {0};
-                available_device.device_type = data->device_type;
-                memcpy(available_device.mac_addr, recv_data->mac_addr, 6);
-                available_device.frequency = data->payload_data.keep_alive_message.message_frequency;
-                available_device.time = esp_timer_get_time() / 1000000;
-                zh_vector_push_back(&gateway_config->available_device_vector, &available_device);
+                else
+                {
+                    if (gateway_config->syslog_is_enable == true)
+                    {
+                        zh_syslog_send(ZH_USER, ZH_WARNING, mac, zh_get_device_type_value_name(data->device_type), "Disconnected from gateway.");
+                    }
+                }
+                heap_caps_free(mac);
                 xSemaphoreGive(gateway_config->device_check_in_progress_mutex);
             }
             zh_espnow_send_mqtt_json_keep_alive_message(data, recv_data->mac_addr, gateway_config);
@@ -645,8 +655,6 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                     }
                     else if (strncmp(incoming_payload, "restart", strlen(incoming_payload) + 1) == 0)
                     {
-                        zh_espnow_data_t data = {0};
-                        data.device_type = ZHDT_GATEWAY;
                         data.payload_type = ZHPT_KEEP_ALIVE;
                         data.payload_data.keep_alive_message.online_status = ZH_OFFLINE;
                         zh_send_message(NULL, (uint8_t *)&data, sizeof(zh_espnow_data_t));
@@ -752,6 +760,12 @@ void zh_mqtt_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                     break;
                 }
                 data.payload_data.config_message.switch_hardware_config_message.sensor_type = zh_sensor_type_check(atoi(extracted_hardware_data));
+                extracted_hardware_data = strtok(NULL, ","); // Extract sensor measurement frequency value.
+                if (extracted_hardware_data == NULL)
+                {
+                    break;
+                }
+                data.payload_data.config_message.switch_hardware_config_message.measurement_frequency = zh_uint16_value_check(atoi(extracted_hardware_data));
                 data.payload_type = ZHPT_HARDWARE;
                 zh_send_message(incoming_data_mac, (uint8_t *)&data, sizeof(zh_espnow_data_t));
                 break;
@@ -1064,7 +1078,6 @@ void zh_espnow_ota_update_task(void *pvParameter)
     char *mac = (char *)heap_caps_malloc(18, MALLOC_CAP_8BIT);
     memset(mac, 0, 18);
     sprintf(mac, "" MAC_STR "", MAC2STR(gateway_config->espnow_ota_data.mac_addr));
-    // heap_caps_free(mac);
     xSemaphoreTake(gateway_config->espnow_ota_in_progress_mutex, portMAX_DELAY);
     zh_espnow_data_t data = {0};
     data.device_type = ZHDT_GATEWAY;
@@ -1215,7 +1228,7 @@ void zh_device_availability_check_task(void *pvParameter)
             {
                 break;
             }
-            if (esp_timer_get_time() / 1000000 > available_device->time + (available_device->frequency * 3))
+            if (esp_timer_get_time() / 1000000 > available_device->time + (available_device->frequency * 1.50)) // + 50% just in case.
             {
                 char *topic = (char *)heap_caps_malloc(strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(available_device->device_type)) + 27, MALLOC_CAP_8BIT);
                 memset(topic, 0, strlen(gateway_config->software_config.mqtt_topic_prefix) + strlen(zh_get_device_type_value_name(available_device->device_type)) + 27);
@@ -1235,7 +1248,7 @@ void zh_device_availability_check_task(void *pvParameter)
             }
         }
         xSemaphoreGive(gateway_config->device_check_in_progress_mutex);
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
     vTaskDelete(NULL);
 }
@@ -1298,7 +1311,7 @@ void zh_gateway_send_mqtt_json_config_message(const gateway_config_t *gateway_co
     data.payload_data.config_message.binary_sensor_config_message.binary_sensor_device_class = HABSDC_CONNECTIVITY;
     data.payload_data.config_message.binary_sensor_config_message.payload_on = HAONOFT_CONNECT;
     data.payload_data.config_message.binary_sensor_config_message.payload_off = HAONOFT_NONE;
-    data.payload_data.config_message.binary_sensor_config_message.expire_after = 30;
+    data.payload_data.config_message.binary_sensor_config_message.expire_after = ZH_GATEWAY_KEEP_ALIVE_MESSAGE_TIME * 1.50; // + 50% just in case.
     data.payload_data.config_message.binary_sensor_config_message.enabled_by_default = true;
     data.payload_data.config_message.binary_sensor_config_message.force_update = true;
     data.payload_data.config_message.binary_sensor_config_message.qos = 2;
@@ -1320,7 +1333,7 @@ void zh_gateway_send_mqtt_json_keep_alive_message_task(void *pvParameter)
         zh_send_message(NULL, (uint8_t *)&data, sizeof(zh_espnow_data_t));
         data.payload_type = ZHPT_STATE;
         zh_espnow_binary_sensor_send_mqtt_json_status_message(&data, gateway_config->self_mac, gateway_config);
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        vTaskDelay(ZH_GATEWAY_KEEP_ALIVE_MESSAGE_TIME * 1000 / portTICK_PERIOD_MS);
     }
     vTaskDelete(NULL);
 }
